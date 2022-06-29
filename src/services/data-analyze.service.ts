@@ -67,6 +67,7 @@ export class DataAnalyzeService {
       let rsiBullish = false;
       let rsiOverSold = false;
       let bollingerBandNearBottom = false;
+      let rsiBullishDivergenceFormed = false;
 
       // custom logic to analyze chart
 
@@ -83,6 +84,14 @@ export class DataAnalyzeService {
         symbol,
         chartTimeframe
       );
+
+      rsiBullishDivergenceFormed =
+        this.analyzeStrategyService.rsiBullishDivergenceFormed(
+          inputValues,
+          rsiResults,
+          symbol,
+          chartTimeframe
+        );
 
       bollingerBandNearBottom =
         this.analyzeStrategyService.bollingerBandNearBottom(
@@ -103,7 +112,7 @@ export class DataAnalyzeService {
           requiredLogBbBearish
         );
 
-      if (rsiBullish || bollingerBandNearBottom) {
+      if (rsiBullish || bollingerBandNearBottom || rsiBullishDivergenceFormed) {
         let lastPriceRecord = chartData[key][chartData[key].length - 1];
 
         if (bollingerBandIsNotBearish) {
@@ -123,6 +132,7 @@ export class DataAnalyzeService {
               bollingerBandPercentage: bbDownPercentage,
               lastRsiValue: rsiResults[rsiResults.length - 1],
               rsiBullish: rsiBullish,
+              rsiBullishDivergenceFormed: rsiBullishDivergenceFormed,
               bollingerNearBottom: bollingerBandNearBottom,
               timeFrame: chartTimeframe,
             };

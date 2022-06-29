@@ -99,8 +99,12 @@ export class PaperTradeService {
       let canPlaceRSIAndBollingerCombinedTrade =
         bullishCandidate.rsiBullish && bullishCandidate.bollingerNearBottom;
 
+      let rsiBullishDivergenceFormed =
+        bullishCandidate.rsiBullishDivergenceFormed;
+
       let atLeastOneConditionSatisfied =
         canPlaceRSIOnlyTrade ||
+        rsiBullishDivergenceFormed ||
         canPlaceBollingerOnlyTrade ||
         canPlaceRSIAndBollingerCombinedTrade;
 
@@ -111,7 +115,10 @@ export class PaperTradeService {
         let stopProfit: number =
           (buyPrice / 100) * (100 + 1 + this.tradeFeePrecentage); // default reward;
 
-        if (canPlaceRSIAndBollingerCombinedTrade) {
+        if (
+          canPlaceRSIAndBollingerCombinedTrade ||
+          rsiBullishDivergenceFormed
+        ) {
           let bollingerOnePrecent =
             (bullishCandidate.lastBollingerValue.middle -
               bullishCandidate.lastBollingerValue.lower) /
@@ -183,7 +190,7 @@ export class PaperTradeService {
 
     if (stopProfitIsHit) {
       this.removeFromRecentlyLostSymbolList(trade.symbol);
-      this.pushToRecentOrderStatusStack(OrderCompleteStatus.failed);
+      this.pushToRecentOrderStatusStack(OrderCompleteStatus.success);
     } else {
       this.addToRecentlyLostSymbolList(trade.symbol);
       this.pushToRecentOrderStatusStack(OrderCompleteStatus.failed);

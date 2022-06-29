@@ -213,4 +213,17 @@ export class MessageConstructService {
       TelegramChannels.paperTradeChannel
     );
   }
+
+  public async notifyRsiBullishDivergence(
+    symbol: string,
+    timeFrame: ChartTimeframe
+  ) {
+    let message = `💎 <b>${trimUSDT(
+      symbol
+    )} - ${timeFrame}</b>\nRSI Bullish Divergence Formed`;
+    await this.telegramService.pushMessage(
+      message,
+      TelegramChannels.paperTradeChannel
+    );
+  }
 }

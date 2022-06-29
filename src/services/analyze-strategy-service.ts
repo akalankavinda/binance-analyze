@@ -1,5 +1,6 @@
 import { BollingerBandsOutput } from "technicalindicators/declarations/volatility/BollingerBands";
 import { ChartTimeframe } from "../enums/chart-timeframes.enum";
+import { RsiWithPrice } from "../models/rsi-with-price.mode";
 import { MessageConstructService } from "./message-construct-service";
 
 export class AnalyzeStrategyService {
@@ -52,6 +53,72 @@ export class AnalyzeStrategyService {
       } else {
         return false;
       }
+    } else {
+      return false;
+    }
+  }
+
+  public rsiBullishDivergenceFormed(
+    inputValues: number[],
+    rsiResults: number[],
+    symbol: string,
+    timeFrame: ChartTimeframe
+  ): boolean {
+    if (rsiResults.length > 55) {
+      let rsiWithPriceList: RsiWithPrice[] = [];
+      for (let index = 0; index < 50; index++) {
+        rsiWithPriceList.push({
+          rsiValue: rsiResults[rsiResults.length - index],
+          closePrice: inputValues[inputValues.length - index],
+          candleIndex: rsiResults.length - index,
+        });
+      }
+
+      // sort by rsi value in accending order
+      rsiWithPriceList.sort((a, b) => {
+        return a.rsiValue - b.rsiValue;
+      });
+
+      let deepBottom = rsiWithPriceList[0];
+      let shallowBottom = rsiWithPriceList[1];
+
+      let bottomsAreInOversoldRegion =
+        deepBottom.rsiValue < 30 && shallowBottom.rsiValue < 35;
+
+      let bottomsHasEnoughCandleGap =
+        shallowBottom.candleIndex - deepBottom.candleIndex > 20;
+
+      let rsiBottomsShowAccendingOrder =
+        shallowBottom.rsiValue > deepBottom.rsiValue;
+
+      let pricesShowDescendingOrder =
+        shallowBottom.closePrice < deepBottom.closePrice;
+
+      let lastClosedCandleFormedBottom =
+        rsiResults[rsiResults.length - 1] > rsiResults[rsiResults.length - 2] &&
+        rsiResults[rsiResults.length - 2] > rsiResults[rsiResults.length - 3] &&
+        rsiResults[rsiResults.length - 3] < rsiResults[rsiResults.length - 4] &&
+        rsiResults[rsiResults.length - 4] < rsiResults[rsiResults.length - 5];
+
+      let lastClosedCandleIsTheShallowBottom =
+        shallowBottom.rsiValue === rsiResults[rsiResults.length - 3];
+
+      let rsiBullishDivergenceFormed =
+        bottomsAreInOversoldRegion &&
+        bottomsHasEnoughCandleGap &&
+        rsiBottomsShowAccendingOrder &&
+        pricesShowDescendingOrder &&
+        lastClosedCandleFormedBottom &&
+        lastClosedCandleIsTheShallowBottom;
+
+      if (rsiBullishDivergenceFormed) {
+        this.messageConstructService.notifyRsiBullishDivergence(
+          symbol,
+          timeFrame
+        );
+      }
+
+      return rsiBullishDivergenceFormed;
     } else {
       return false;
     }
