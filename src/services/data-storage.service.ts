@@ -21,7 +21,7 @@ export class DataStorageService {
   private last15MinuteEventNumber: number = 0;
   private latestSymbolValues: ChartData = {};
 
-  private stableCoins = [
+  private excludeList = [
     "USDC",
     "BUSD",
     "DAI",
@@ -189,18 +189,18 @@ export class DataStorageService {
 
       typeCastedResults.forEach((priceRecord: PriceRecordDto) => {
         // skip downcoins
-        let isDownCoin = false;
+        let isDownCoin = /DOWN$/.test(priceRecord.symbol);
         //isDownCoin = priceRecord.symbol.indexOf("DOWN") > 0;
 
         //skip stablecoins
-        let isStableCoin = false;
-        this.stableCoins.forEach((item) => {
+        let excludeSymbol = false;
+        this.excludeList.forEach((item) => {
           if (priceRecord.symbol.includes(item)) {
-            isStableCoin = true;
+            excludeSymbol = true;
           }
         });
 
-        if (!isStableCoin && !isDownCoin) {
+        if (!excludeSymbol && !isDownCoin) {
           if (tmpChartData[priceRecord.symbol] === undefined) {
             tmpChartData[priceRecord.symbol] = [priceRecord];
           } else {

@@ -66,7 +66,7 @@ export class MessageConstructService {
   // }
 
   public addToSessionSignalsList(trade: PaperTrade): void {
-    let message = `🔮 <b>${trimUSDT(trade.symbol)}</b> - ${trade.timeFrame}\n`;
+    let message = `🔮 <b>${trimUSDT(trade.symbol)} - ${trade.timeFrame}</b>\n`;
     message += `Buy at: ${trade.buyPrice}\n`;
     message += `<u><i>SELL(OCO):</i></u>\n`;
     message += `Price: ${trade.stopProfit}\n`;
@@ -77,16 +77,16 @@ export class MessageConstructService {
   }
 
   public addToSessionBuyOrderHitList(trade: PaperTrade): void {
-    let message = `💵 <b>${trimUSDT(trade.symbol)}</b> - ${
+    let message = `💵 <b>${trimUSDT(trade.symbol)} - ${
       trade.timeFrame
-    } buy order placed\n`;
+    }</b> buy order placed\n`;
     this.sessionBuyOrderHitMessage += message;
   }
 
   public addToSessionOrderExpiredList(trade: PaperTrade): void {
     let message = `🗑 <b>${trimUSDT(trade.symbol)} - ${
       trade.timeFrame
-    }</b> trade EXPIRED\n`;
+    }</b> trade expired\n`;
     this.sessionOrderExpiredMessage += message;
   }
 
@@ -162,10 +162,12 @@ export class MessageConstructService {
 
   public async notifySellTrade(trade: PaperTrade, isProfit: boolean) {
     let message = isProfit
-      ? `✅ <b>${trimUSDT(trade.symbol)}</b> - ${
+      ? `✅ <b>${trimUSDT(trade.symbol)} - ${
           trade.timeFrame
-        } trade hit PROFIT\n`
-      : `✴️ <b>${trimUSDT(trade.symbol)}</b> - ${trade.timeFrame} trade LOST\n`;
+        }</b> trade hit profit\n`
+      : `⛔️ <b>${trimUSDT(trade.symbol)} - ${
+          trade.timeFrame
+        }</b> trade lost\n`;
     await this.telegramService.pushMessage(
       message,
       TelegramChannels.paperTradeChannel
@@ -187,9 +189,25 @@ export class MessageConstructService {
     message += `<code>Active Trades: ${minTradeAmount}USD x ${activeTradeCount}</code>\n`;
     message += `<code>Pending Trades: ${pendingTradeCount}</code>\n`;
     message += `<code>Finished Trades: ${totalTradeCount}</code>\n`;
-    message += `<code>Winning rate: ${winningRateStr}%</code>\n`;
+    message += `<code>Winning rate: ${winningRateStr}% (${profitTradeCount}/${totalTradeCount})</code>\n`;
     message += `<code>Account Balance: ${roundNum(accountBalance)}USD</code>\n`;
     message += `<code>TOTAL PROFIT: ${roundNum(totalProfit)}USD</code>\n`;
+    await this.telegramService.pushMessage(
+      message,
+      TelegramChannels.paperTradeChannel
+    );
+  }
+
+  public async notifyTradesPaused() {
+    let message = `⏸ Paused placing new orders`;
+    await this.telegramService.pushMessage(
+      message,
+      TelegramChannels.paperTradeChannel
+    );
+  }
+
+  public async notifyTradesResumed() {
+    let message = `▶️ Resumed placing new orders`;
     await this.telegramService.pushMessage(
       message,
       TelegramChannels.paperTradeChannel

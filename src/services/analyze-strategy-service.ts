@@ -128,46 +128,4 @@ export class AnalyzeStrategyService {
       return false;
     }
   }
-
-  public ema9Cross18Upwards(
-    inputValues: number[],
-    ema9Results: number[],
-    ema18Results: number[],
-    symbol: string,
-    timeFrame: ChartTimeframe
-  ): boolean {
-    if (ema9Results.length > 20 && ema18Results.length > 20) {
-      let currentEma9 = ema9Results[ema9Results.length - 1];
-      let currentEma18 = ema18Results[ema18Results.length - 1];
-      let lastEma9_1 = ema9Results[ema9Results.length - 2];
-      let lastEma18_1 = ema18Results[ema18Results.length - 2];
-      let lastEma9_2 = ema9Results[ema9Results.length - 3];
-      let lastEma18_2 = ema18Results[ema18Results.length - 3];
-
-      let bullishCrossHappened =
-        currentEma9 >= currentEma18 &&
-        lastEma9_1 < lastEma18_1 &&
-        lastEma9_2 < lastEma18_2;
-
-      let recentHistoryIsAlsoDown = true;
-      for (let index = 2; index < 18; index++) {
-        let tmp9Val = ema9Results[ema9Results.length - index];
-        let tmp18Val = ema18Results[ema18Results.length - index];
-        if (tmp9Val > tmp18Val) {
-          recentHistoryIsAlsoDown = false;
-        }
-      }
-
-      let emaCrossUpwardConfirmed =
-        bullishCrossHappened && recentHistoryIsAlsoDown;
-
-      if (emaCrossUpwardConfirmed) {
-        this.messageConstructService.addToSessionEMAList(symbol, timeFrame);
-      }
-
-      return emaCrossUpwardConfirmed;
-    } else {
-      return false;
-    }
-  }
 }

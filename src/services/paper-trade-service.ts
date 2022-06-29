@@ -10,6 +10,7 @@ import { PaperTradeSouce } from "../models/paper-trade-source.model";
 import { BearishCandidate } from "../models/bearish-candidate.model";
 import { ChartTimeframe } from "../enums/chart-timeframes.enum";
 import { MessageConstructService } from "./message-construct-service";
+import { OrderCompleteStatus } from "../enums/order-complete-status.enum";
 
 export class PaperTradeService {
   private static _instance: PaperTradeService;
@@ -27,7 +28,7 @@ export class PaperTradeService {
   private messageConstructService = MessageConstructService.getInstance();
   private logWriter = LogWriterService.getInstance();
 
-  private minTradeAmountUsd: number = 20;
+  private minTradeAmountUsd: number = 50;
   private startingAmountUsd: number = 1000;
   private currentBalanceUsd!: number;
   private minProfitPrecentage = 0.5;
@@ -43,7 +44,10 @@ export class PaperTradeService {
 
   private pendingBuyOrders: PaperTrade[] = [];
   private pendingSellOrders: PaperTrade[] = [];
-  private recentlyLostList: string[] = [];
+  private recentlyLostSymbolList: string[] = [];
+
+  private placingRealOrdersAllowed: boolean = true;
+  private recentOrderStatusStack: OrderCompleteStatus[] = [];
 
   constructor() {
     this.currentBalanceUsd = this.startingAmountUsd;
@@ -80,15 +84,14 @@ export class PaperTradeService {
     let currentPrice = bullishCandidate.priceRecord.close;
     let timeFrame = bullishCandidate.timeFrame;
 
-    let recentlyLost = this.hasRecentlyLost(symbol);
+    let tradingIsPaused = !this.placingRealOrdersAllowed;
+    let symbolRecentlyLost = this.hasRecentlyLost(symbol);
     let noPendingBuyOrders = !this.hasPendingBuyOrder(symbol, timeFrame);
     let noPendingSellOrders = !this.hasPendingSellOrder(symbol, timeFrame);
 
     if (noPendingBuyOrders && noPendingSellOrders) {
       let canPlaceRSIOnlyTrade =
         bullishCandidate.rsiBullish && bullishCandidate.lastRsiValue < 30;
-
-      let canPlaceEMAOnlyTrade = bullishCandidate.emaCrossedBullish;
 
       let canPlaceBollingerOnlyTrade =
         bullishCandidate.bollingerBandPercentage > 90;
@@ -98,7 +101,6 @@ export class PaperTradeService {
 
       let atLeastOneConditionSatisfied =
         canPlaceRSIOnlyTrade ||
-        canPlaceEMAOnlyTrade ||
         canPlaceBollingerOnlyTrade ||
         canPlaceRSIAndBollingerCombinedTrade;
 
@@ -150,10 +152,20 @@ export class PaperTradeService {
             buyPrice: Utils.roundNum(buyPrice),
             stopLoss: Utils.roundNum(stopLoss),
             stopProfit: Utils.roundNum(stopProfit),
-            isHiddenTrade: recentlyLost,
+            isHiddenTrade: symbolRecentlyLost || tradingIsPaused,
             timeFrame: bullishCandidate.timeFrame,
             timestamp: new Date().getTime(),
           };
+
+          this.pendingBuyOrders.forEach((item, index) => {
+            if (
+              item.symbol === newTrade.symbol &&
+              item.timeFrame === newTrade.timeFrame &&
+              newTrade.buyPrice < item.buyPrice
+            ) {
+              this.pendingBuyOrders.splice(index, 1);
+            }
+          });
 
           this.pendingBuyOrders.push(newTrade);
 
@@ -167,14 +179,17 @@ export class PaperTradeService {
 
   private async sellActiveOrder(tradeIndex: number, sellPrice: number) {
     let trade = this.pendingSellOrders[tradeIndex];
-    let stopLossIsHit = sellPrice <= trade.stopLoss;
     let stopProfitIsHit = sellPrice >= trade.stopProfit;
 
-    if (stopLossIsHit) {
-      this.addToRecentlyLostList(trade.symbol);
-    } else if (stopProfitIsHit) {
-      this.removeFromRecentlyLostList(trade.symbol);
+    if (stopProfitIsHit) {
+      this.removeFromRecentlyLostSymbolList(trade.symbol);
+      this.pushToRecentOrderStatusStack(OrderCompleteStatus.failed);
+    } else {
+      this.addToRecentlyLostSymbolList(trade.symbol);
+      this.pushToRecentOrderStatusStack(OrderCompleteStatus.failed);
     }
+
+    this.pauseOrResumePlacingNewOrders();
 
     if (!trade.isHiddenTrade) {
       let soldAmountUSD = Utils.roundNum(trade.amount * sellPrice);
@@ -302,20 +317,75 @@ export class PaperTradeService {
     );
   }
 
-  private hasRecentlyLost(symbol: string): boolean {
-    return this.recentlyLostList.includes(symbol);
-  }
+  private pauseOrResumePlacingNewOrders() {
+    if (this.recentOrderStatusStack.length > 3) {
+      if (this.placingRealOrdersAllowed) {
+        let atLeastOneTradeSucceeded =
+          this.recentOrderStatusStack[0] === OrderCompleteStatus.success ||
+          this.recentOrderStatusStack[1] === OrderCompleteStatus.success ||
+          this.recentOrderStatusStack[2] === OrderCompleteStatus.success;
 
-  private removeFromRecentlyLostList(symbol: string) {
-    let index = this.recentlyLostList.indexOf(symbol);
-    if (index > 0) {
-      this.recentlyLostList.splice(index, 1);
+        this.placingRealOrdersAllowed = atLeastOneTradeSucceeded;
+        if (!atLeastOneTradeSucceeded) {
+          this.makeAllPendingOrdersHidden();
+          this.reduceRiskForActiveTrades();
+          this.messageConstructService.notifyTradesPaused();
+        }
+      } else {
+        let tradesSucceededInRow =
+          this.recentOrderStatusStack[0] === OrderCompleteStatus.success &&
+          this.recentOrderStatusStack[1] === OrderCompleteStatus.success &&
+          this.recentOrderStatusStack[2] === OrderCompleteStatus.success;
+
+        this.placingRealOrdersAllowed = tradesSucceededInRow;
+        if (tradesSucceededInRow) {
+          this.makeAllPendingOrdersVisible();
+          this.messageConstructService.notifyTradesResumed();
+        }
+      }
     }
   }
 
-  private addToRecentlyLostList(symbol: string) {
-    if (!this.recentlyLostList.includes(symbol)) {
-      this.recentlyLostList.push(symbol);
+  private makeAllPendingOrdersHidden() {
+    this.pendingBuyOrders.forEach((item, index) => {
+      this.pendingBuyOrders[index].isHiddenTrade = true;
+    });
+  }
+
+  private makeAllPendingOrdersVisible() {
+    this.pendingBuyOrders.forEach((item, index) => {
+      this.pendingBuyOrders[index].isHiddenTrade = false;
+    });
+  }
+
+  private reduceRiskForActiveTrades() {
+    this.pendingSellOrders.forEach((item, index) => {
+      let newStopLoss = (item.buyPrice / 100) * 98;
+      this.pendingSellOrders[index].stopLoss = newStopLoss;
+    });
+  }
+
+  private pushToRecentOrderStatusStack(status: OrderCompleteStatus) {
+    this.recentOrderStatusStack.unshift(status);
+    if (this.recentOrderStatusStack.length > 10) {
+      this.recentOrderStatusStack = this.recentOrderStatusStack.slice(0, 9);
+    }
+  }
+
+  private hasRecentlyLost(symbol: string): boolean {
+    return this.recentlyLostSymbolList.includes(symbol);
+  }
+
+  private removeFromRecentlyLostSymbolList(symbol: string) {
+    let index = this.recentlyLostSymbolList.indexOf(symbol);
+    if (index > 0) {
+      this.recentlyLostSymbolList.splice(index, 1);
+    }
+  }
+
+  private addToRecentlyLostSymbolList(symbol: string) {
+    if (!this.recentlyLostSymbolList.includes(symbol)) {
+      this.recentlyLostSymbolList.push(symbol);
     }
   }
 

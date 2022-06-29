@@ -7,7 +7,6 @@ export interface BullishCandidate {
   lastBollingerValue: BollingerBandsOutput;
   lastRsiValue: number;
   bollingerBandPercentage: number;
-  emaCrossedBullish: boolean;
   rsiBullish: boolean;
   bollingerNearBottom: boolean;
   timeFrame: ChartTimeframe;

@@ -63,15 +63,10 @@ export class DataAnalyzeService {
         values: inputValues,
         period: 9,
       });
-      let ema18Results = EMA.calculate({
-        values: inputValues,
-        period: 18,
-      });
 
       let rsiBullish = false;
       let rsiOverSold = false;
       let bollingerBandNearBottom = false;
-      let emaBullish = false;
 
       // custom logic to analyze chart
 
@@ -97,14 +92,6 @@ export class DataAnalyzeService {
           chartTimeframe
         );
 
-      emaBullish = this.analyzeStrategyService.ema9Cross18Upwards(
-        inputValues,
-        ema9Results,
-        ema18Results,
-        symbol,
-        chartTimeframe
-      );
-
       let requiredLogBbBearish = rsiOverSold || bollingerBandNearBottom;
 
       let bollingerBandIsNotBearish =
@@ -116,7 +103,7 @@ export class DataAnalyzeService {
           requiredLogBbBearish
         );
 
-      if (rsiBullish || bollingerBandNearBottom || emaBullish) {
+      if (rsiBullish || bollingerBandNearBottom) {
         let lastPriceRecord = chartData[key][chartData[key].length - 1];
 
         if (bollingerBandIsNotBearish) {
@@ -137,7 +124,6 @@ export class DataAnalyzeService {
               lastRsiValue: rsiResults[rsiResults.length - 1],
               rsiBullish: rsiBullish,
               bollingerNearBottom: bollingerBandNearBottom,
-              emaCrossedBullish: emaBullish,
               timeFrame: chartTimeframe,
             };
 
