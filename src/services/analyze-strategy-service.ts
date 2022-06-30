@@ -66,7 +66,7 @@ export class AnalyzeStrategyService {
   ): boolean {
     if (rsiResults.length > 55) {
       let rsiWithPriceList: RsiWithPrice[] = [];
-      for (let index = 0; index < 50; index++) {
+      for (let index = 0; index < 55; index++) {
         rsiWithPriceList.push({
           rsiValue: rsiResults[rsiResults.length - index],
           closePrice: inputValues[inputValues.length - index],
@@ -74,13 +74,24 @@ export class AnalyzeStrategyService {
         });
       }
 
-      // sort by rsi value in accending order
-      rsiWithPriceList.sort((a, b) => {
-        return a.rsiValue - b.rsiValue;
+      let deepBottom: RsiWithPrice = rsiWithPriceList[0];
+      rsiWithPriceList.forEach((item) => {
+        if (item.rsiValue < deepBottom.rsiValue) {
+          deepBottom = item;
+        }
       });
 
-      let deepBottom = rsiWithPriceList[0];
-      let shallowBottom = rsiWithPriceList[1];
+      let shallowBottom: RsiWithPrice = {
+        rsiValue: rsiResults[rsiResults.length - 3],
+        closePrice: inputValues[rsiResults.length - 3],
+        candleIndex: rsiResults.length - 3,
+      };
+
+      let lastClosedCandleFormedShallowBottom =
+        rsiResults[rsiResults.length - 1] > rsiResults[rsiResults.length - 2] &&
+        rsiResults[rsiResults.length - 2] > rsiResults[rsiResults.length - 3] &&
+        rsiResults[rsiResults.length - 3] < rsiResults[rsiResults.length - 4] &&
+        rsiResults[rsiResults.length - 4] < rsiResults[rsiResults.length - 5];
 
       let bottomsAreInOversoldRegion =
         deepBottom.rsiValue < 30 && shallowBottom.rsiValue < 35;
@@ -94,22 +105,12 @@ export class AnalyzeStrategyService {
       let pricesShowDescendingOrder =
         shallowBottom.closePrice < deepBottom.closePrice;
 
-      let lastClosedCandleFormedBottom =
-        rsiResults[rsiResults.length - 1] > rsiResults[rsiResults.length - 2] &&
-        rsiResults[rsiResults.length - 2] > rsiResults[rsiResults.length - 3] &&
-        rsiResults[rsiResults.length - 3] < rsiResults[rsiResults.length - 4] &&
-        rsiResults[rsiResults.length - 4] < rsiResults[rsiResults.length - 5];
-
-      let lastClosedCandleIsTheShallowBottom =
-        shallowBottom.rsiValue === rsiResults[rsiResults.length - 3];
-
       let rsiBullishDivergenceFormed =
         bottomsAreInOversoldRegion &&
         bottomsHasEnoughCandleGap &&
         rsiBottomsShowAccendingOrder &&
         pricesShowDescendingOrder &&
-        lastClosedCandleFormedBottom &&
-        lastClosedCandleIsTheShallowBottom;
+        lastClosedCandleFormedShallowBottom;
 
       if (rsiBullishDivergenceFormed) {
         this.messageConstructService.notifyRsiBullishDivergence(
