@@ -66,7 +66,21 @@ export class MessageConstructService {
   // }
 
   public addToSessionSignalsList(trade: PaperTrade): void {
-    let message = `🔮 <b>${trimUSDT(trade.symbol)} - ${trade.timeFrame}</b>\n`;
+    let twoHourTimeFrame = trade.timeFrame === ChartTimeframe.TWO_HOUR;
+    let largeTimeFrame =
+      trade.timeFrame === ChartTimeframe.FOUR_HOUR ||
+      trade.timeFrame === ChartTimeframe.TWELVE_HOUR ||
+      trade.timeFrame === ChartTimeframe.ONE_DAY;
+
+    let largeTimeFrameIndicator = largeTimeFrame
+      ? " 💎"
+      : twoHourTimeFrame
+      ? " ✨"
+      : "";
+
+    let message = `🔮 <b>${trimUSDT(trade.symbol)} - ${
+      trade.timeFrame
+    }</b>${largeTimeFrameIndicator}\n`;
     message += `Buy at: ${trade.buyPrice}\n`;
     message += `<u><i>SELL(OCO):</i></u>\n`;
     message += `Price: ${trade.stopProfit}\n`;

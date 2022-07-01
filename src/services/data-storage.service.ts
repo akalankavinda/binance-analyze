@@ -108,33 +108,12 @@ export class DataStorageService {
     //   ChartTimeframe.FIFTEEN_MINUTE
     // );
 
-    await this.fetchTimeFrameChartData(
-      eventNumber30Minute,
-      DataStorageTable.table30Minute,
-      ChartTimeframe.THIRTY_MINUTE
-    );
-
-    await this.fetchTimeFrameChartData(
-      eventNumber1Hour,
-      DataStorageTable.table1Hour,
-      ChartTimeframe.ONE_HOUR
-    );
-
-    // once every 30 minutes
-    if (eventNumber15Minute % 2 === 0) {
+    // once every 4 hour
+    if (eventNumber15Minute % 16 === 0) {
       await this.fetchTimeFrameChartData(
-        eventNumber2Hour,
-        DataStorageTable.table2Hour,
-        ChartTimeframe.TWO_HOUR
-      );
-    }
-
-    // once every 1 hour
-    if (eventNumber15Minute % 4 === 0) {
-      await this.fetchTimeFrameChartData(
-        eventNumber4Hour,
-        DataStorageTable.table4Hour,
-        ChartTimeframe.FOUR_HOUR
+        eventNumber1Day,
+        DataStorageTable.table1Day,
+        ChartTimeframe.ONE_DAY
       );
     }
 
@@ -147,14 +126,35 @@ export class DataStorageService {
       );
     }
 
-    // once every 4 hour
-    if (eventNumber15Minute % 16 === 0) {
+    // once every 1 hour
+    if (eventNumber15Minute % 4 === 0) {
       await this.fetchTimeFrameChartData(
-        eventNumber1Day,
-        DataStorageTable.table1Day,
-        ChartTimeframe.ONE_DAY
+        eventNumber4Hour,
+        DataStorageTable.table4Hour,
+        ChartTimeframe.FOUR_HOUR
       );
     }
+
+    // once every 30 minutes
+    if (eventNumber15Minute % 2 === 0) {
+      await this.fetchTimeFrameChartData(
+        eventNumber2Hour,
+        DataStorageTable.table2Hour,
+        ChartTimeframe.TWO_HOUR
+      );
+    }
+
+    await this.fetchTimeFrameChartData(
+      eventNumber1Hour,
+      DataStorageTable.table1Hour,
+      ChartTimeframe.ONE_HOUR
+    );
+
+    await this.fetchTimeFrameChartData(
+      eventNumber30Minute,
+      DataStorageTable.table30Minute,
+      ChartTimeframe.THIRTY_MINUTE
+    );
 
     await this.dataAnalyzeService.finishCurrentSessionProcessing();
   }
@@ -189,7 +189,7 @@ export class DataStorageService {
 
       typeCastedResults.forEach((priceRecord: PriceRecordDto) => {
         // skip downcoins
-        let isDownCoin = /DOWN$/.test(priceRecord.symbol);
+        // let isDownCoin = /DOWN$/.test(priceRecord.symbol);
         //isDownCoin = priceRecord.symbol.indexOf("DOWN") > 0;
 
         //skip stablecoins
@@ -200,7 +200,7 @@ export class DataStorageService {
           }
         });
 
-        if (!excludeSymbol && !isDownCoin) {
+        if (!excludeSymbol) {
           if (tmpChartData[priceRecord.symbol] === undefined) {
             tmpChartData[priceRecord.symbol] = [priceRecord];
           } else {

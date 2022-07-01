@@ -93,13 +93,13 @@ export class DataAnalyzeService {
           chartTimeframe
         );
 
-      bollingerBandNearBottom =
-        this.analyzeStrategyService.bollingerBandNearBottom(
-          inputValues,
-          bollingerBandResults,
-          symbol,
-          chartTimeframe
-        );
+      // bollingerBandNearBottom =
+      //   this.analyzeStrategyService.bollingerBandNearBottom(
+      //     inputValues,
+      //     bollingerBandResults,
+      //     symbol,
+      //     chartTimeframe
+      //   );
 
       let requiredLogBbBearish = rsiOverSold || bollingerBandNearBottom;
 

@@ -37,16 +37,19 @@ export class AnalyzeStrategyService {
     timeFrame: ChartTimeframe
   ): boolean {
     if (rsiResults.length > 10) {
+      let lastClosed2ndValue = rsiResults[rsiResults.length - 3];
       let lastClosedValue = rsiResults[rsiResults.length - 2];
       let currentValue = rsiResults[rsiResults.length - 1];
 
-      let lastClosedCandleIsOverSold = lastClosedValue < 31;
-      let currentCandleShowsStrength = currentValue > lastClosedValue;
-      let currentValueIsNearOversold = currentValue < 33;
+      let lastClosed2ndCandleIsOverSold = lastClosed2ndValue < 30;
+      let lastClosedCandleIsBullish = lastClosedValue > lastClosed2ndValue;
+      let currentCandlesIsBullish = currentValue > lastClosedValue - 1;
+      let currentValueIsNearOversold = lastClosedValue < 35;
 
       if (
-        lastClosedCandleIsOverSold &&
-        currentCandleShowsStrength &&
+        lastClosed2ndCandleIsOverSold &&
+        lastClosedCandleIsBullish &&
+        currentCandlesIsBullish &&
         currentValueIsNearOversold
       ) {
         return true;
@@ -97,7 +100,7 @@ export class AnalyzeStrategyService {
         deepBottom.rsiValue < 30 && shallowBottom.rsiValue < 35;
 
       let bottomsHasEnoughCandleGap =
-        shallowBottom.candleIndex - deepBottom.candleIndex > 20;
+        shallowBottom.candleIndex - deepBottom.candleIndex > 10;
 
       let rsiBottomsShowAccendingOrder =
         shallowBottom.rsiValue > deepBottom.rsiValue;

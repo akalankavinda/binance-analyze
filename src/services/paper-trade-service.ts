@@ -31,21 +31,23 @@ export class PaperTradeService {
   private minTradeAmountUsd: number = 50;
   private startingAmountUsd: number = 1000;
   private currentBalanceUsd!: number;
-  private minProfitPrecentage = 0.5;
-  private tradeFeePrecentage: number = 0.1;
-  private buyBuffer: number = 0.15;
+  private minProfitPercentage = 0.5;
+  private tradeFeePercentage: number = 0.1;
+  private buyBuffer: number = 0.125;
+  private tradeExpireTime = 1000 * 60 * 60; // one hour
+
+  private bollingerBandProfitPercentage = 20;
+  private bollingerBandLossPercentage = 35;
+  private rsiDivergenceProfitPercentage = 100;
+  private rsiDivergenceLossPercentage = 30;
+
+  // memory storage variables
   private profitTradeCount = 0;
   private totalTradeCount = 0;
   private totalProfit = 0;
-  private tradeExpireTime = 1000 * 60 * 60; // one hour
-
-  private bollingerBandProfitPrecentage = 20;
-  private bollingerBandLossPrecentage = 35;
-
   private pendingBuyOrders: PaperTrade[] = [];
   private pendingSellOrders: PaperTrade[] = [];
   private recentlyLostSymbolList: string[] = [];
-
   private placingRealOrdersAllowed: boolean = true;
   private recentOrderStatusStack: OrderCompleteStatus[] = [];
 
@@ -111,46 +113,41 @@ export class PaperTradeService {
       if (atLeastOneConditionSatisfied) {
         let buyPrice: number = (currentPrice / 100) * (100 - this.buyBuffer);
 
-        let stopLoss: number = (buyPrice / 100) * (100 - 7.5); // default risk
+        let stopLoss: number = (buyPrice / 100) * (100 - 2); // default risk
         let stopProfit: number =
-          (buyPrice / 100) * (100 + 1 + this.tradeFeePrecentage); // default reward;
+          (buyPrice / 100) * (100 + 1 + this.tradeFeePercentage); // default reward;
 
-        if (
-          canPlaceRSIAndBollingerCombinedTrade ||
-          rsiBullishDivergenceFormed
-        ) {
+        if (canPlaceRSIAndBollingerCombinedTrade) {
           let bollingerOnePrecent =
             (bullishCandidate.lastBollingerValue.middle -
               bullishCandidate.lastBollingerValue.lower) /
             100;
 
           stopLoss =
-            buyPrice - bollingerOnePrecent * this.bollingerBandLossPrecentage;
+            buyPrice - bollingerOnePrecent * this.bollingerBandLossPercentage;
           stopProfit =
-            buyPrice + bollingerOnePrecent * this.bollingerBandProfitPrecentage;
+            buyPrice + bollingerOnePrecent * this.bollingerBandProfitPercentage;
+        } else if (rsiBullishDivergenceFormed) {
+          let bollingerOnePrecent =
+            (bullishCandidate.lastBollingerValue.middle -
+              bullishCandidate.lastBollingerValue.lower) /
+            100;
+
+          stopLoss =
+            buyPrice - bollingerOnePrecent * this.rsiDivergenceLossPercentage;
+          stopProfit =
+            buyPrice + bollingerOnePrecent * this.rsiDivergenceProfitPercentage;
         } else {
-          if (timeFrame === ChartTimeframe.TWO_HOUR) {
-            stopLoss = (buyPrice / 100) * (100 - 9.375); // risk
-            stopProfit =
-              (buyPrice / 100) * (100 + 1.25 + this.tradeFeePrecentage); // reward
-          } else if (timeFrame === ChartTimeframe.FOUR_HOUR) {
-            stopLoss = (buyPrice / 100) * (100 - 11.25); // risk
-            stopProfit =
-              (buyPrice / 100) * (100 + 1.5 + this.tradeFeePrecentage); // reward
-          } else if (timeFrame === ChartTimeframe.TWELVE_HOUR) {
-            stopLoss = (buyPrice / 100) * (100 - 13.125); // risk
-            stopProfit =
-              (buyPrice / 100) * (100 + 1.75 + this.tradeFeePrecentage); // reward
-          } else if (timeFrame === ChartTimeframe.ONE_DAY) {
-            stopLoss = (buyPrice / 100) * (100 - 14); // risk
-            stopProfit = (buyPrice / 100) * (100 + 2 + this.tradeFeePrecentage); // reward
-          }
+          stopLoss = this.getRsiStopLoss(buyPrice, timeFrame);
+          stopProfit = this.getRsiStopProfit(buyPrice, timeFrame);
         }
 
         let buyAmount = this.minTradeAmountUsd / buyPrice;
         let minProfitSellPrice =
           (buyPrice / 100) *
-          (100 + this.minProfitPrecentage + this.tradeFeePrecentage);
+          (100 + this.minProfitPercentage + this.tradeFeePercentage);
+
+        let tradeIsHidden = symbolRecentlyLost || tradingIsPaused;
 
         if (stopProfit >= minProfitSellPrice) {
           let newTrade: PaperTrade = {
@@ -159,7 +156,7 @@ export class PaperTradeService {
             buyPrice: Utils.roundNum(buyPrice),
             stopLoss: Utils.roundNum(stopLoss),
             stopProfit: Utils.roundNum(stopProfit),
-            isHiddenTrade: symbolRecentlyLost || tradingIsPaused,
+            isHiddenTrade: tradeIsHidden,
             timeFrame: bullishCandidate.timeFrame,
             timestamp: new Date().getTime(),
           };
@@ -176,7 +173,7 @@ export class PaperTradeService {
 
           this.pendingBuyOrders.push(newTrade);
 
-          if (!newTrade.isHiddenTrade) {
+          if (!tradeIsHidden) {
             this.messageConstructService.addToSessionSignalsList(newTrade);
           }
         }
@@ -196,25 +193,24 @@ export class PaperTradeService {
       this.pushToRecentOrderStatusStack(OrderCompleteStatus.failed);
     }
 
-    this.pauseOrResumePlacingNewOrders();
+    let soldAmountUSD = Utils.roundNum(trade.amount * sellPrice);
+
+    let hiddenText = trade.isHiddenTrade ? "HIDDEN" : "";
+    this.logWriter.info(
+      `PAPER TRADE: ${hiddenText} SELL ${Utils.trimUSDT(
+        trade.symbol
+      )} at price ${Utils.roundNum(sellPrice)} for ${Utils.roundNum(
+        soldAmountUSD
+      )}USD`
+    );
 
     if (!trade.isHiddenTrade) {
-      let soldAmountUSD = Utils.roundNum(trade.amount * sellPrice);
-
       if (stopProfitIsHit) {
         this.profitTradeCount += 1;
       }
       this.totalTradeCount += 1;
       this.totalProfit += soldAmountUSD - this.minTradeAmountUsd;
       this.currentBalanceUsd += soldAmountUSD;
-
-      this.logWriter.info(
-        `PAPER TRADE: SELL ${Utils.trimUSDT(
-          trade.symbol
-        )} at price ${Utils.roundNum(sellPrice)} for ${Utils.roundNum(
-          soldAmountUSD
-        )}USD`
-      );
 
       this.logWriter.info(
         `Total Profit: ${Utils.roundNum(
@@ -230,6 +226,8 @@ export class PaperTradeService {
 
     // remove trade from active trade list
     this.pendingSellOrders.splice(tradeIndex, 1);
+
+    this.pauseOrResumePlacingNewOrders();
   }
 
   // when price hits the buying price, trigger the pending buy order
@@ -244,15 +242,20 @@ export class PaperTradeService {
 
           if (balanceIsEnough && buyPriceHit) {
             this.pendingSellOrders.push(buyOrder);
-            this.currentBalanceUsd -= this.minTradeAmountUsd;
             this.pendingBuyOrders.splice(buyOrderIndex, 1);
 
+            let hiddenText = buyOrder.isHiddenTrade ? "HIDDEN" : "";
+            this.logWriter.info(
+              `PAPER TRADE: ${hiddenText} BUY ${Utils.trimUSDT(
+                buyOrder.symbol
+              )} at price ${buyOrder.buyPrice} | pending orders: ${
+                this.pendingBuyOrders.length
+              }`
+            );
+
             if (!buyOrder.isHiddenTrade) {
-              this.logWriter.info(
-                `PAPER TRADE: BUY ${Utils.trimUSDT(buyOrder.symbol)} at price ${
-                  buyOrder.buyPrice
-                } | pending orders: ${this.pendingBuyOrders.length}`
-              );
+              this.currentBalanceUsd -= this.minTradeAmountUsd;
+
               this.messageConstructService.addToSessionBuyOrderHitList(
                 buyOrder
               );
@@ -262,8 +265,12 @@ export class PaperTradeService {
             this.tradeExpireTime
           ) {
             // remove expired pending-buy-orders
-            this.messageConstructService.addToSessionOrderExpiredList(buyOrder);
             this.pendingBuyOrders.splice(buyOrderIndex, 1);
+            if (this.placingRealOrdersAllowed) {
+              this.messageConstructService.addToSessionOrderExpiredList(
+                buyOrder
+              );
+            }
           }
         }
       });
@@ -312,14 +319,27 @@ export class PaperTradeService {
   ///////////////////////////////////////////
 
   public async sendAccountUpdate() {
+    let pendingSellOrderCount = 0;
+    let pendingBuyOrderCount = 0;
+    this.pendingSellOrders.forEach((item) => {
+      if (!item.isHiddenTrade) {
+        pendingSellOrderCount += 1;
+      }
+    });
+    this.pendingBuyOrders.forEach((item) => {
+      if (!item.isHiddenTrade) {
+        pendingBuyOrderCount += 1;
+      }
+    });
+
     await this.messageConstructService.constructAndSendBuySignalMessage();
     await this.messageConstructService.notifyAccountUpdate(
       this.totalProfit,
       this.profitTradeCount,
       this.totalTradeCount,
       this.currentBalanceUsd,
-      this.pendingSellOrders.length,
-      this.pendingBuyOrders.length,
+      pendingSellOrderCount,
+      pendingBuyOrderCount,
       this.minTradeAmountUsd
     );
   }
@@ -432,5 +452,36 @@ export class PaperTradeService {
       }
     });
     return hasTrades;
+  }
+
+  private getRsiStopProfit(
+    buyPrice: number,
+    timeFrame: ChartTimeframe
+  ): number {
+    if (timeFrame === ChartTimeframe.TWO_HOUR) {
+      return (buyPrice / 100) * (100 + 1.75 + this.tradeFeePercentage); // reward
+    } else if (timeFrame === ChartTimeframe.FOUR_HOUR) {
+      return (buyPrice / 100) * (100 + 3 + this.tradeFeePercentage); // reward
+    } else if (timeFrame === ChartTimeframe.TWELVE_HOUR) {
+      return (buyPrice / 100) * (100 + 5 + this.tradeFeePercentage); // reward
+    } else if (timeFrame === ChartTimeframe.ONE_DAY) {
+      return (buyPrice / 100) * (100 + 8 + this.tradeFeePercentage); // reward
+    } else {
+      return (buyPrice / 100) * (100 + 1 + this.tradeFeePercentage); // reward
+    }
+  }
+
+  private getRsiStopLoss(buyPrice: number, timeFrame: ChartTimeframe): number {
+    if (timeFrame === ChartTimeframe.TWO_HOUR) {
+      return (buyPrice / 100) * (100 - 3.5); // risk
+    } else if (timeFrame === ChartTimeframe.FOUR_HOUR) {
+      return (buyPrice / 100) * (100 - 6); // risk
+    } else if (timeFrame === ChartTimeframe.TWELVE_HOUR) {
+      return (buyPrice / 100) * (100 - 10); // risk
+    } else if (timeFrame === ChartTimeframe.ONE_DAY) {
+      return (buyPrice / 100) * (100 - 16); // risk
+    } else {
+      return (buyPrice / 100) * (100 - 2); // risk
+    }
   }
 }
