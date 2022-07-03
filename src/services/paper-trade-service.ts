@@ -92,8 +92,7 @@ export class PaperTradeService {
     let noPendingSellOrders = !this.hasPendingSellOrder(symbol, timeFrame);
 
     if (noPendingBuyOrders && noPendingSellOrders) {
-      let canPlaceRSIOnlyTrade =
-        bullishCandidate.rsiBullish && bullishCandidate.lastRsiValue < 30;
+      let canPlaceRSIOnlyTrade = bullishCandidate.rsiBullish;
 
       let canPlaceBollingerOnlyTrade =
         bullishCandidate.bollingerBandPercentage > 90;
@@ -137,7 +136,7 @@ export class PaperTradeService {
             buyPrice - bollingerOnePrecent * this.rsiDivergenceLossPercentage;
           stopProfit =
             buyPrice + bollingerOnePrecent * this.rsiDivergenceProfitPercentage;
-        } else {
+        } else if (canPlaceRSIOnlyTrade) {
           stopLoss = this.getRsiStopLoss(buyPrice, timeFrame);
           stopProfit = this.getRsiStopProfit(buyPrice, timeFrame);
         }
@@ -204,6 +203,9 @@ export class PaperTradeService {
       )}USD`
     );
 
+    // remove trade from active trade list
+    this.pendingSellOrders.splice(tradeIndex, 1);
+
     if (!trade.isHiddenTrade) {
       if (stopProfitIsHit) {
         this.profitTradeCount += 1;
@@ -223,9 +225,6 @@ export class PaperTradeService {
         stopProfitIsHit
       );
     }
-
-    // remove trade from active trade list
-    this.pendingSellOrders.splice(tradeIndex, 1);
 
     this.pauseOrResumePlacingNewOrders();
   }
@@ -352,10 +351,11 @@ export class PaperTradeService {
           this.recentOrderStatusStack[1] === OrderCompleteStatus.success ||
           this.recentOrderStatusStack[2] === OrderCompleteStatus.success;
 
-        this.placingRealOrdersAllowed = atLeastOneTradeSucceeded;
         if (!atLeastOneTradeSucceeded) {
+          this.placingRealOrdersAllowed = false;
           this.makeAllPendingOrdersHidden();
           this.reduceRiskForActiveTrades();
+          this.logWriter.info(`PAUSED PLACING NEW ORDERS`);
           this.messageConstructService.notifyTradesPaused();
         }
       } else {
@@ -364,9 +364,10 @@ export class PaperTradeService {
           this.recentOrderStatusStack[1] === OrderCompleteStatus.success &&
           this.recentOrderStatusStack[2] === OrderCompleteStatus.success;
 
-        this.placingRealOrdersAllowed = tradesSucceededInRow;
         if (tradesSucceededInRow) {
+          this.placingRealOrdersAllowed = true;
           this.makeAllPendingOrdersVisible();
+          this.logWriter.info(`RESUMED PLACING NEW ORDERS`);
           this.messageConstructService.notifyTradesResumed();
         }
       }
@@ -473,15 +474,15 @@ export class PaperTradeService {
 
   private getRsiStopLoss(buyPrice: number, timeFrame: ChartTimeframe): number {
     if (timeFrame === ChartTimeframe.TWO_HOUR) {
-      return (buyPrice / 100) * (100 - 3.5); // risk
+      return (buyPrice / 100) * (100 - 1.75); // risk
     } else if (timeFrame === ChartTimeframe.FOUR_HOUR) {
-      return (buyPrice / 100) * (100 - 6); // risk
+      return (buyPrice / 100) * (100 - 3); // risk
     } else if (timeFrame === ChartTimeframe.TWELVE_HOUR) {
-      return (buyPrice / 100) * (100 - 10); // risk
+      return (buyPrice / 100) * (100 - 5); // risk
     } else if (timeFrame === ChartTimeframe.ONE_DAY) {
-      return (buyPrice / 100) * (100 - 16); // risk
+      return (buyPrice / 100) * (100 - 8); // risk
     } else {
-      return (buyPrice / 100) * (100 - 2); // risk
+      return (buyPrice / 100) * (100 - 1); // risk
     }
   }
 }

@@ -37,20 +37,19 @@ export class AnalyzeStrategyService {
     timeFrame: ChartTimeframe
   ): boolean {
     if (rsiResults.length > 10) {
-      let lastClosed2ndValue = rsiResults[rsiResults.length - 3];
       let lastClosedValue = rsiResults[rsiResults.length - 2];
       let currentValue = rsiResults[rsiResults.length - 1];
 
-      let lastClosed2ndCandleIsOverSold = lastClosed2ndValue < 30;
-      let lastClosedCandleIsBullish = lastClosedValue > lastClosed2ndValue;
-      let currentCandlesIsBullish = currentValue > lastClosedValue - 1;
-      let currentValueIsNearOversold = lastClosedValue < 35;
+      let lastClosedCandleIsBullish = lastClosedValue < 30;
+      let currentCandlesIsBullish = currentValue > lastClosedValue;
+      let currentValueIsCrossingBottomLine = currentValue > 29;
+      let currentValueIsStillGoodToBuy = currentValue < 33;
 
       if (
-        lastClosed2ndCandleIsOverSold &&
         lastClosedCandleIsBullish &&
         currentCandlesIsBullish &&
-        currentValueIsNearOversold
+        currentValueIsCrossingBottomLine &&
+        currentValueIsStillGoodToBuy
       ) {
         return true;
       } else {
@@ -135,10 +134,10 @@ export class AnalyzeStrategyService {
     timeFrame: ChartTimeframe,
     logMessage: boolean = false
   ): boolean {
-    if (bbResults.length > 12) {
+    if (bbResults.length > 6) {
       // filter bearish trend along the bollinger band bottom
       let bearishCandleCount = 0;
-      for (let index = 2; index < 10; index++) {
+      for (let index = 2; index < 5; index++) {
         let tmpPrice = inputValues[inputValues.length - index];
         let tmpBbLowerValue = bbResults[bbResults.length - index].lower;
         if (tmpPrice < tmpBbLowerValue) {
@@ -146,7 +145,7 @@ export class AnalyzeStrategyService {
         }
       }
 
-      let tradingBelowBbBottom = bearishCandleCount > 0;
+      let tradingBelowBbBottom = bearishCandleCount > 1;
 
       if (tradingBelowBbBottom && logMessage) {
         //this.messageConstructService.addToSessionBearishList(symbol, timeFrame);

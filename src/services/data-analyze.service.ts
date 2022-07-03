@@ -37,8 +37,6 @@ export class DataAnalyzeService {
     chartData: ChartData,
     chartTimeframe: ChartTimeframe
   ) {
-    this.logWriter.info(`analyzing ${chartTimeframe} data`);
-
     Object.keys(chartData).forEach((key: string) => {
       let inputValues: number[] = [];
       let latestPrice = chartData[key][chartData[key].length - 1].close;
@@ -93,13 +91,13 @@ export class DataAnalyzeService {
           chartTimeframe
         );
 
-      // bollingerBandNearBottom =
-      //   this.analyzeStrategyService.bollingerBandNearBottom(
-      //     inputValues,
-      //     bollingerBandResults,
-      //     symbol,
-      //     chartTimeframe
-      //   );
+      bollingerBandNearBottom =
+        this.analyzeStrategyService.bollingerBandNearBottom(
+          inputValues,
+          bollingerBandResults,
+          symbol,
+          chartTimeframe
+        );
 
       let requiredLogBbBearish = rsiOverSold || bollingerBandNearBottom;
 
