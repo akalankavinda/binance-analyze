@@ -60,7 +60,7 @@ export class DataStorageService {
       let currentTimeStamp = new Date().getTime();
       let current1MinuteEventNumber = Math.floor(currentTimeStamp / 60000);
       this.fetch1MinuteChartData(current1MinuteEventNumber);
-    }, 10000);
+    }, 20000);
   }
 
   private async fetch1MinuteChartData(eventNumber1Minute: number) {
@@ -110,8 +110,8 @@ export class DataStorageService {
     //   ChartTimeframe.FIFTEEN_MINUTE
     // );
 
-    // once every 4 hour
-    if (eventNumber15Minute % 16 === 0) {
+    // once every 6 hour
+    if (eventNumber15Minute % 24 === 0) {
       chartString = `, ${ChartTimeframe.ONE_DAY}${chartString}`;
       await this.fetchTimeFrameChartData(
         eventNumber1Day,
@@ -120,8 +120,8 @@ export class DataStorageService {
       );
     }
 
-    // once every 2 hour
-    if (eventNumber15Minute % 8 === 0) {
+    // once every 4 hour
+    if (eventNumber15Minute % 16 === 0) {
       chartString = `, ${ChartTimeframe.TWELVE_HOUR}${chartString}`;
       await this.fetchTimeFrameChartData(
         eventNumber12Hour,
@@ -130,8 +130,8 @@ export class DataStorageService {
       );
     }
 
-    // once every 1 hour
-    if (eventNumber15Minute % 4 === 0) {
+    // once every 3 hour
+    if (eventNumber15Minute % 12 === 0) {
       chartString = `, ${ChartTimeframe.FOUR_HOUR}${chartString}`;
       await this.fetchTimeFrameChartData(
         eventNumber4Hour,
@@ -140,8 +140,8 @@ export class DataStorageService {
       );
     }
 
-    // once every 30 minutes
-    if (eventNumber15Minute % 2 === 0) {
+    // once every 1 hour
+    if (eventNumber15Minute % 4 === 0) {
       chartString = `, ${ChartTimeframe.TWO_HOUR}${chartString}`;
       await this.fetchTimeFrameChartData(
         eventNumber2Hour,
@@ -150,18 +150,22 @@ export class DataStorageService {
       );
     }
 
-    chartString = ` ${ChartTimeframe.ONE_HOUR}${chartString}`;
-    await this.fetchTimeFrameChartData(
-      eventNumber1Hour,
-      DataStorageTable.table1Hour,
-      ChartTimeframe.ONE_HOUR
-    );
+    // once every 30 minutes
+    if (eventNumber15Minute % 2 === 0) {
+      chartString = `, ${ChartTimeframe.ONE_HOUR}${chartString}`;
+      await this.fetchTimeFrameChartData(
+        eventNumber1Hour,
+        DataStorageTable.table1Hour,
+        ChartTimeframe.ONE_HOUR
+      );
+    }
 
-    // await this.fetchTimeFrameChartData(
-    //   eventNumber30Minute,
-    //   DataStorageTable.table30Minute,
-    //   ChartTimeframe.THIRTY_MINUTE
-    // );
+    chartString = ` ${ChartTimeframe.THIRTY_MINUTE}${chartString}`;
+    await this.fetchTimeFrameChartData(
+      eventNumber30Minute,
+      DataStorageTable.table30Minute,
+      ChartTimeframe.THIRTY_MINUTE
+    );
 
     this.logWriter.info(`analyzing chart data:${chartString}`);
     // once every 1 hour

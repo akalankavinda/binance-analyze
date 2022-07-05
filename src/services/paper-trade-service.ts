@@ -92,7 +92,9 @@ export class PaperTradeService {
     let noPendingSellOrders = !this.hasPendingSellOrder(symbol, timeFrame);
 
     if (noPendingBuyOrders && noPendingSellOrders) {
-      let canPlaceRSIOnlyTrade = bullishCandidate.rsiBullish;
+      let canPlaceRSIOnlyTrade =
+        bullishCandidate.rsiBullish ||
+        bullishCandidate.rsiWithMovingAverageBullish;
 
       let canPlaceBollingerOnlyTrade =
         bullishCandidate.bollingerBandPercentage > 90;
@@ -194,11 +196,11 @@ export class PaperTradeService {
 
     let soldAmountUSD = Utils.roundNum(trade.amount * sellPrice);
 
-    let hiddenText = trade.isHiddenTrade ? "HIDDEN" : "";
+    let hiddenText = trade.isHiddenTrade ? " HIDDEN" : "";
     this.logWriter.info(
-      `PAPER TRADE: ${hiddenText} SELL ${Utils.trimUSDT(
-        trade.symbol
-      )} at price ${Utils.roundNum(sellPrice)} for ${Utils.roundNum(
+      `PAPER TRADE:${hiddenText} SELL ${Utils.trimUSDT(trade.symbol)}-${
+        trade.timeFrame
+      } at price ${Utils.roundNum(sellPrice)} for ${Utils.roundNum(
         soldAmountUSD
       )}USD`
     );
@@ -243,13 +245,13 @@ export class PaperTradeService {
             this.pendingSellOrders.push(buyOrder);
             this.pendingBuyOrders.splice(buyOrderIndex, 1);
 
-            let hiddenText = buyOrder.isHiddenTrade ? "HIDDEN" : "";
+            let hiddenText = buyOrder.isHiddenTrade ? " HIDDEN" : "";
             this.logWriter.info(
-              `PAPER TRADE: ${hiddenText} BUY ${Utils.trimUSDT(
+              `PAPER TRADE:${hiddenText} BUY ${Utils.trimUSDT(
                 buyOrder.symbol
-              )} at price ${buyOrder.buyPrice} | pending orders: ${
-                this.pendingBuyOrders.length
-              }`
+              )}-${buyOrder.timeFrame} at price ${
+                buyOrder.buyPrice
+              } | pending orders: ${this.pendingBuyOrders.length}`
             );
 
             if (!buyOrder.isHiddenTrade) {
@@ -375,9 +377,10 @@ export class PaperTradeService {
   }
 
   private makeAllPendingOrdersHidden() {
-    this.pendingBuyOrders.forEach((item, index) => {
-      this.pendingBuyOrders[index].isHiddenTrade = true;
-    });
+    // this.pendingBuyOrders.forEach((item, index) => {
+    //   this.pendingBuyOrders[index].isHiddenTrade = true;
+    // });
+    this.pendingBuyOrders = [];
   }
 
   private makeAllPendingOrdersVisible() {
@@ -474,15 +477,15 @@ export class PaperTradeService {
 
   private getRsiStopLoss(buyPrice: number, timeFrame: ChartTimeframe): number {
     if (timeFrame === ChartTimeframe.TWO_HOUR) {
-      return (buyPrice / 100) * (100 - 1.75); // risk
+      return (buyPrice / 100) * (100 - 5.25); // risk
     } else if (timeFrame === ChartTimeframe.FOUR_HOUR) {
-      return (buyPrice / 100) * (100 - 3); // risk
+      return (buyPrice / 100) * (100 - 9); // risk
     } else if (timeFrame === ChartTimeframe.TWELVE_HOUR) {
-      return (buyPrice / 100) * (100 - 5); // risk
+      return (buyPrice / 100) * (100 - 15); // risk
     } else if (timeFrame === ChartTimeframe.ONE_DAY) {
-      return (buyPrice / 100) * (100 - 8); // risk
+      return (buyPrice / 100) * (100 - 24); // risk
     } else {
-      return (buyPrice / 100) * (100 - 1); // risk
+      return (buyPrice / 100) * (100 - 3); // risk
     }
   }
 }

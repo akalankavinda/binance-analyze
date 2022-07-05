@@ -8,6 +8,7 @@ export interface BullishCandidate {
   lastRsiValue: number;
   bollingerBandPercentage: number;
   rsiBullish: boolean;
+  rsiWithMovingAverageBullish: boolean;
   rsiBullishDivergenceFormed: boolean;
   bollingerNearBottom: boolean;
   timeFrame: ChartTimeframe;

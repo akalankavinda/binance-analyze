@@ -1,5 +1,5 @@
 import { Subject } from "rxjs";
-import { RSI, EMA, BollingerBands } from "technicalindicators";
+import { RSI, EMA, BollingerBands, SMA } from "technicalindicators";
 import { ChartTimeframe } from "../enums/chart-timeframes.enum";
 import { ChartData } from "../models/chart-data";
 import { PriceRecordDto } from "../models/price-record.dto";
@@ -11,6 +11,7 @@ import { PaperTradeSouce } from "../models/paper-trade-source.model";
 import { BearishCandidate } from "../models/bearish-candidate.model";
 import { AnalyzeStrategyService } from "./analyze-strategy-service";
 import { MessageConstructService } from "./message-construct-service";
+import { MAInput } from "technicalindicators/declarations/moving_averages/SMA";
 
 export class DataAnalyzeService {
   private static _instance: DataAnalyzeService;
@@ -57,15 +58,16 @@ export class DataAnalyzeService {
         period: 14,
       });
 
-      let ema9Results = EMA.calculate({
+      let sma200Results = SMA.calculate(<MAInput>{
         values: inputValues,
-        period: 9,
+        period: 200,
       });
 
       let rsiBullish = false;
       let rsiOverSold = false;
       let bollingerBandNearBottom = false;
       let rsiBullishDivergenceFormed = false;
+      let rsiWithMOvingAverageIsBullish = false;
 
       // custom logic to analyze chart
 
@@ -82,6 +84,14 @@ export class DataAnalyzeService {
         symbol,
         chartTimeframe
       );
+
+      rsiWithMOvingAverageIsBullish =
+        this.analyzeStrategyService.rsiWithMovingAverageIsBullish(
+          rsiResults,
+          sma200Results,
+          symbol,
+          chartTimeframe
+        );
 
       rsiBullishDivergenceFormed =
         this.analyzeStrategyService.rsiBullishDivergenceFormed(
@@ -110,7 +120,12 @@ export class DataAnalyzeService {
           requiredLogBbBearish
         );
 
-      if (rsiBullish || bollingerBandNearBottom || rsiBullishDivergenceFormed) {
+      if (
+        rsiBullish ||
+        rsiWithMOvingAverageIsBullish ||
+        bollingerBandNearBottom ||
+        rsiBullishDivergenceFormed
+      ) {
         let lastPriceRecord = chartData[key][chartData[key].length - 1];
 
         if (bollingerBandIsNotBearish) {
@@ -130,6 +145,7 @@ export class DataAnalyzeService {
               bollingerBandPercentage: bbDownPercentage,
               lastRsiValue: rsiResults[rsiResults.length - 1],
               rsiBullish: rsiBullish,
+              rsiWithMovingAverageBullish: rsiWithMOvingAverageIsBullish,
               rsiBullishDivergenceFormed: rsiBullishDivergenceFormed,
               bollingerNearBottom: bollingerBandNearBottom,
               timeFrame: chartTimeframe,

@@ -237,7 +237,7 @@ export class MessageConstructService {
     )} - ${timeFrame}</b>\nRSI Bullish Divergence Formed`;
     await this.telegramService.pushMessage(
       message,
-      TelegramChannels.paperTradeChannel
+      TelegramChannels.logChannel
     );
   }
 }
