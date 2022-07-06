@@ -11,6 +11,7 @@ import { BearishCandidate } from "../models/bearish-candidate.model";
 import { ChartTimeframe } from "../enums/chart-timeframes.enum";
 import { MessageConstructService } from "./message-construct-service";
 import { OrderCompleteStatus } from "../enums/order-complete-status.enum";
+import { AnalyzeStrategy } from "../enums/analyze-strategies.enum";
 
 export class PaperTradeService {
   private static _instance: PaperTradeService;
@@ -92,91 +93,53 @@ export class PaperTradeService {
     let noPendingSellOrders = !this.hasPendingSellOrder(symbol, timeFrame);
 
     if (noPendingBuyOrders && noPendingSellOrders) {
-      let canPlaceRSIOnlyTrade =
-        bullishCandidate.rsiBullish ||
-        bullishCandidate.rsiWithMovingAverageBullish;
+      let strategy = bullishCandidate.strategy;
+      let buyPrice: number = (currentPrice / 100) * (100 - this.buyBuffer);
 
-      let canPlaceBollingerOnlyTrade =
-        bullishCandidate.bollingerBandPercentage > 90;
+      let stopLoss: number = this.getStopLoss(buyPrice, timeFrame, strategy);
+      let stopProfit: number = this.getStopProfit(
+        buyPrice,
+        timeFrame,
+        strategy
+      );
 
-      let canPlaceRSIAndBollingerCombinedTrade =
-        bullishCandidate.rsiBullish && bullishCandidate.bollingerNearBottom;
+      let buyAmount = this.minTradeAmountUsd / buyPrice;
+      let minProfitSellPrice =
+        (buyPrice / 100) *
+        (100 + this.minProfitPercentage + this.tradeFeePercentage);
 
-      let rsiBullishDivergenceFormed =
-        bullishCandidate.rsiBullishDivergenceFormed;
+      let tradeIsHidden = symbolRecentlyLost || tradingIsPaused;
 
-      let atLeastOneConditionSatisfied =
-        canPlaceRSIOnlyTrade ||
-        rsiBullishDivergenceFormed ||
-        canPlaceBollingerOnlyTrade ||
-        canPlaceRSIAndBollingerCombinedTrade;
+      if (stopProfit >= minProfitSellPrice) {
+        let newTrade: PaperTrade = {
+          symbol: symbol,
+          amount: Utils.roundNum(buyAmount),
+          buyPrice: Utils.roundNum(buyPrice),
+          stopLoss: Utils.roundNum(stopLoss),
+          stopProfit: Utils.roundNum(stopProfit),
+          isHiddenTrade: tradeIsHidden,
+          timeFrame: bullishCandidate.timeFrame,
+          timestamp: new Date().getTime(),
+          strategy: strategy,
+        };
 
-      if (atLeastOneConditionSatisfied) {
-        let buyPrice: number = (currentPrice / 100) * (100 - this.buyBuffer);
-
-        let stopLoss: number = (buyPrice / 100) * (100 - 2); // default risk
-        let stopProfit: number =
-          (buyPrice / 100) * (100 + 1 + this.tradeFeePercentage); // default reward;
-
-        if (canPlaceRSIAndBollingerCombinedTrade) {
-          let bollingerOnePrecent =
-            (bullishCandidate.lastBollingerValue.middle -
-              bullishCandidate.lastBollingerValue.lower) /
-            100;
-
-          stopLoss =
-            buyPrice - bollingerOnePrecent * this.bollingerBandLossPercentage;
-          stopProfit =
-            buyPrice + bollingerOnePrecent * this.bollingerBandProfitPercentage;
-        } else if (rsiBullishDivergenceFormed) {
-          let bollingerOnePrecent =
-            (bullishCandidate.lastBollingerValue.middle -
-              bullishCandidate.lastBollingerValue.lower) /
-            100;
-
-          stopLoss =
-            buyPrice - bollingerOnePrecent * this.rsiDivergenceLossPercentage;
-          stopProfit =
-            buyPrice + bollingerOnePrecent * this.rsiDivergenceProfitPercentage;
-        } else if (canPlaceRSIOnlyTrade) {
-          stopLoss = this.getRsiStopLoss(buyPrice, timeFrame);
-          stopProfit = this.getRsiStopProfit(buyPrice, timeFrame);
-        }
-
-        let buyAmount = this.minTradeAmountUsd / buyPrice;
-        let minProfitSellPrice =
-          (buyPrice / 100) *
-          (100 + this.minProfitPercentage + this.tradeFeePercentage);
-
-        let tradeIsHidden = symbolRecentlyLost || tradingIsPaused;
-
-        if (stopProfit >= minProfitSellPrice) {
-          let newTrade: PaperTrade = {
-            symbol: symbol,
-            amount: Utils.roundNum(buyAmount),
-            buyPrice: Utils.roundNum(buyPrice),
-            stopLoss: Utils.roundNum(stopLoss),
-            stopProfit: Utils.roundNum(stopProfit),
-            isHiddenTrade: tradeIsHidden,
-            timeFrame: bullishCandidate.timeFrame,
-            timestamp: new Date().getTime(),
-          };
-
-          this.pendingBuyOrders.forEach((item, index) => {
-            if (
-              item.symbol === newTrade.symbol &&
-              item.timeFrame === newTrade.timeFrame &&
-              newTrade.buyPrice < item.buyPrice
-            ) {
-              this.pendingBuyOrders.splice(index, 1);
-            }
-          });
-
-          this.pendingBuyOrders.push(newTrade);
-
-          if (!tradeIsHidden) {
-            this.messageConstructService.addToSessionSignalsList(newTrade);
+        this.pendingBuyOrders.forEach((item, index) => {
+          if (
+            item.symbol === newTrade.symbol &&
+            item.timeFrame === newTrade.timeFrame &&
+            newTrade.buyPrice < item.buyPrice
+          ) {
+            this.pendingBuyOrders.splice(index, 1);
           }
+        });
+
+        this.pendingBuyOrders.push(newTrade);
+
+        if (!tradeIsHidden) {
+          this.messageConstructService.addToSessionSignalsList(
+            newTrade,
+            bullishCandidate
+          );
         }
       }
     }
@@ -249,9 +212,9 @@ export class PaperTradeService {
             this.logWriter.info(
               `PAPER TRADE:${hiddenText} BUY ${Utils.trimUSDT(
                 buyOrder.symbol
-              )}-${buyOrder.timeFrame} at price ${
-                buyOrder.buyPrice
-              } | pending orders: ${this.pendingBuyOrders.length}`
+              )}-${buyOrder.timeFrame} at price ${buyOrder.buyPrice} | ${
+                buyOrder.strategy
+              }`
             );
 
             if (!buyOrder.isHiddenTrade) {
@@ -458,34 +421,80 @@ export class PaperTradeService {
     return hasTrades;
   }
 
-  private getRsiStopProfit(
+  //
+  //
+  //
+  //
+  //
+
+  private getStopProfit(
     buyPrice: number,
-    timeFrame: ChartTimeframe
+    timeFrame: ChartTimeframe,
+    strategy: AnalyzeStrategy
   ): number {
-    if (timeFrame === ChartTimeframe.TWO_HOUR) {
-      return (buyPrice / 100) * (100 + 1.75 + this.tradeFeePercentage); // reward
-    } else if (timeFrame === ChartTimeframe.FOUR_HOUR) {
-      return (buyPrice / 100) * (100 + 3 + this.tradeFeePercentage); // reward
-    } else if (timeFrame === ChartTimeframe.TWELVE_HOUR) {
-      return (buyPrice / 100) * (100 + 5 + this.tradeFeePercentage); // reward
-    } else if (timeFrame === ChartTimeframe.ONE_DAY) {
-      return (buyPrice / 100) * (100 + 8 + this.tradeFeePercentage); // reward
-    } else {
-      return (buyPrice / 100) * (100 + 1 + this.tradeFeePercentage); // reward
+    let stopProfitPercentage = 1;
+
+    if (
+      strategy === AnalyzeStrategy.RSI_BULLISH ||
+      strategy === AnalyzeStrategy.BOLLINGER_BAND_BULLISH ||
+      strategy === AnalyzeStrategy.RSI_WITH_MA_BULLISH
+    ) {
+      if (timeFrame === ChartTimeframe.TWO_HOUR) {
+        stopProfitPercentage = 1.75;
+      } else if (timeFrame === ChartTimeframe.FOUR_HOUR) {
+        stopProfitPercentage = 3;
+      } else if (timeFrame === ChartTimeframe.TWELVE_HOUR) {
+        stopProfitPercentage = 5;
+      } else if (timeFrame === ChartTimeframe.ONE_DAY) {
+        stopProfitPercentage = 8;
+      } else {
+        stopProfitPercentage = 1;
+      }
+    } else if (strategy === AnalyzeStrategy.RSI_BULLISH_DIVERGENCE) {
+      if (timeFrame === ChartTimeframe.TWO_HOUR) {
+        stopProfitPercentage = 3;
+      } else if (timeFrame === ChartTimeframe.FOUR_HOUR) {
+        stopProfitPercentage = 5;
+      } else if (timeFrame === ChartTimeframe.TWELVE_HOUR) {
+        stopProfitPercentage = 8;
+      } else if (timeFrame === ChartTimeframe.ONE_DAY) {
+        stopProfitPercentage = 14;
+      } else {
+        stopProfitPercentage = 2;
+      }
     }
+
+    return (
+      (buyPrice / 100) * (100 + stopProfitPercentage + this.tradeFeePercentage)
+    ); // reward
   }
 
-  private getRsiStopLoss(buyPrice: number, timeFrame: ChartTimeframe): number {
-    if (timeFrame === ChartTimeframe.TWO_HOUR) {
-      return (buyPrice / 100) * (100 - 5.25); // risk
-    } else if (timeFrame === ChartTimeframe.FOUR_HOUR) {
-      return (buyPrice / 100) * (100 - 9); // risk
-    } else if (timeFrame === ChartTimeframe.TWELVE_HOUR) {
-      return (buyPrice / 100) * (100 - 15); // risk
-    } else if (timeFrame === ChartTimeframe.ONE_DAY) {
-      return (buyPrice / 100) * (100 - 24); // risk
-    } else {
-      return (buyPrice / 100) * (100 - 3); // risk
+  private getStopLoss(
+    buyPrice: number,
+    timeFrame: ChartTimeframe,
+    strategy: AnalyzeStrategy
+  ): number {
+    let stopLossPercentage = 5;
+
+    if (
+      strategy === AnalyzeStrategy.RSI_BULLISH ||
+      strategy === AnalyzeStrategy.BOLLINGER_BAND_BULLISH ||
+      strategy === AnalyzeStrategy.RSI_WITH_MA_BULLISH ||
+      strategy === AnalyzeStrategy.RSI_BULLISH_DIVERGENCE
+    ) {
+      if (timeFrame === ChartTimeframe.TWO_HOUR) {
+        stopLossPercentage = 5.25;
+      } else if (timeFrame === ChartTimeframe.FOUR_HOUR) {
+        stopLossPercentage = 9;
+      } else if (timeFrame === ChartTimeframe.TWELVE_HOUR) {
+        stopLossPercentage = 15;
+      } else if (timeFrame === ChartTimeframe.ONE_DAY) {
+        stopLossPercentage = 24;
+      } else {
+        stopLossPercentage = 3;
+      }
     }
+
+    return (buyPrice / 100) * (100 - stopLossPercentage); // risk
   }
 }

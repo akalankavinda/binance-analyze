@@ -1,5 +1,7 @@
+import { AnalyzeStrategy } from "../enums/analyze-strategies.enum";
 import { ChartTimeframe } from "../enums/chart-timeframes.enum";
 import { TelegramChannels } from "../enums/telegram-channels.enum";
+import { BullishCandidate } from "../models/bullish-candidate.model";
 import { PaperTrade } from "../models/paper-trade";
 import { TelegraService } from "./telegram.service";
 import { roundNum, trimUSDT } from "./utils";
@@ -65,22 +67,33 @@ export class MessageConstructService {
   //   )} <code>- ${timeFrame}</code> <b>Bearish</b>\n`;
   // }
 
-  public addToSessionSignalsList(trade: PaperTrade): void {
+  public addToSessionSignalsList(
+    trade: PaperTrade,
+    candidate: BullishCandidate
+  ): void {
     let twoHourTimeFrame = trade.timeFrame === ChartTimeframe.TWO_HOUR;
     let largeTimeFrame =
       trade.timeFrame === ChartTimeframe.FOUR_HOUR ||
       trade.timeFrame === ChartTimeframe.TWELVE_HOUR ||
       trade.timeFrame === ChartTimeframe.ONE_DAY;
+    let bullishDivergence =
+      candidate.strategy === AnalyzeStrategy.RSI_BULLISH_DIVERGENCE;
 
-    let largeTimeFrameIndicator = largeTimeFrame
-      ? " 💎"
-      : twoHourTimeFrame
-      ? " ✨"
-      : "";
+    let signalIcon = "🔮";
 
-    let message = `🔮 <b>${trimUSDT(trade.symbol)} - ${
+    if (twoHourTimeFrame) {
+      signalIcon = "💰";
+    }
+    if (largeTimeFrame) {
+      signalIcon = "💎";
+    }
+    if (bullishDivergence) {
+      signalIcon = "🔥";
+    }
+
+    let message = `${signalIcon} <b>${trimUSDT(trade.symbol)} - ${
       trade.timeFrame
-    }</b>${largeTimeFrameIndicator}\n`;
+    }</b>\n`;
     message += `Buy at: ${trade.buyPrice}\n`;
     message += `<u><i>SELL(OCO):</i></u>\n`;
     message += `Price: ${trade.stopProfit}\n`;

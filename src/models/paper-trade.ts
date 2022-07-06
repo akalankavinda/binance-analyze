@@ -1,3 +1,4 @@
+import { AnalyzeStrategy } from "../enums/analyze-strategies.enum";
 import { ChartTimeframe } from "../enums/chart-timeframes.enum";
 
 export interface PaperTrade {
@@ -8,5 +9,6 @@ export interface PaperTrade {
   stopProfit: number;
   isHiddenTrade: boolean;
   timeFrame: ChartTimeframe;
+  strategy: AnalyzeStrategy;
   timestamp: number;
 }

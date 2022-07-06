@@ -12,6 +12,7 @@ import { BearishCandidate } from "../models/bearish-candidate.model";
 import { AnalyzeStrategyService } from "./analyze-strategy-service";
 import { MessageConstructService } from "./message-construct-service";
 import { MAInput } from "technicalindicators/declarations/moving_averages/SMA";
+import { AnalyzeStrategy } from "../enums/analyze-strategies.enum";
 
 export class DataAnalyzeService {
   private static _instance: DataAnalyzeService;
@@ -64,19 +65,11 @@ export class DataAnalyzeService {
       });
 
       let rsiBullish = false;
-      let rsiOverSold = false;
-      let bollingerBandNearBottom = false;
+      let bollingerBandBullishBottom = false;
       let rsiBullishDivergenceFormed = false;
       let rsiWithMOvingAverageIsBullish = false;
 
       // custom logic to analyze chart
-
-      // just oversold
-      rsiOverSold = this.analyzeStrategyService.rsiOverSold(
-        rsiResults,
-        symbol,
-        chartTimeframe
-      );
 
       // oversold + trending bullish
       rsiBullish = this.analyzeStrategyService.rsiOverSoldAndTurningBullish(
@@ -101,31 +94,34 @@ export class DataAnalyzeService {
           chartTimeframe
         );
 
-      bollingerBandNearBottom =
-        this.analyzeStrategyService.bollingerBandNearBottom(
+      bollingerBandBullishBottom =
+        this.analyzeStrategyService.bollingerBandBullishBottom(
           inputValues,
           bollingerBandResults,
           symbol,
           chartTimeframe
         );
 
-      let requiredLogBbBearish = rsiOverSold || bollingerBandNearBottom;
-
       let bollingerBandIsNotBearish =
         this.analyzeStrategyService.bollingerBandIsNotBearish(
           inputValues,
           bollingerBandResults,
           symbol,
-          chartTimeframe,
-          requiredLogBbBearish
+          chartTimeframe
         );
 
-      if (
-        rsiBullish ||
-        rsiWithMOvingAverageIsBullish ||
-        bollingerBandNearBottom ||
-        rsiBullishDivergenceFormed
-      ) {
+      let selectedStrategy = AnalyzeStrategy.NOT_AVAILABLE;
+      if (rsiBullishDivergenceFormed) {
+        selectedStrategy = AnalyzeStrategy.RSI_BULLISH_DIVERGENCE;
+      } else if (bollingerBandBullishBottom) {
+        selectedStrategy = AnalyzeStrategy.BOLLINGER_BAND_BULLISH;
+      } else if (rsiWithMOvingAverageIsBullish) {
+        selectedStrategy = AnalyzeStrategy.RSI_WITH_MA_BULLISH;
+      } else if (rsiBullish) {
+        selectedStrategy = AnalyzeStrategy.RSI_BULLISH;
+      }
+
+      if (selectedStrategy != AnalyzeStrategy.NOT_AVAILABLE) {
         let lastPriceRecord = chartData[key][chartData[key].length - 1];
 
         if (bollingerBandIsNotBearish) {
@@ -141,13 +137,7 @@ export class DataAnalyzeService {
 
             let tmpTradeSource = <BullishCandidate>{
               priceRecord: lastPriceRecord,
-              lastBollingerValue: lastBbValue,
-              bollingerBandPercentage: bbDownPercentage,
-              lastRsiValue: rsiResults[rsiResults.length - 1],
-              rsiBullish: rsiBullish,
-              rsiWithMovingAverageBullish: rsiWithMOvingAverageIsBullish,
-              rsiBullishDivergenceFormed: rsiBullishDivergenceFormed,
-              bollingerNearBottom: bollingerBandNearBottom,
+              strategy: selectedStrategy,
               timeFrame: chartTimeframe,
             };
 

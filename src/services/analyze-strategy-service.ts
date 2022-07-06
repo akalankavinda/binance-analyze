@@ -12,25 +12,6 @@ export class AnalyzeStrategyService {
 
   private messageConstructService = MessageConstructService.getInstance();
 
-  public rsiOverSold(
-    rsiResults: number[],
-    symbol: string,
-    timeFrame: ChartTimeframe
-  ): boolean {
-    let currentValue = rsiResults[rsiResults.length - 1];
-    let currentValueIsOversold = currentValue < 30;
-
-    if (currentValueIsOversold) {
-      this.messageConstructService.addToSessionRSIList(
-        symbol,
-        timeFrame,
-        currentValue
-      );
-    }
-
-    return currentValueIsOversold;
-  }
-
   public rsiOverSoldAndTurningBullish(
     rsiResults: number[],
     symbol: string,
@@ -123,12 +104,12 @@ export class AnalyzeStrategyService {
         pricesShowDescendingOrder &&
         lastClosedCandleFormedShallowBottom;
 
-      if (rsiBullishDivergenceFormed) {
-        this.messageConstructService.notifyRsiBullishDivergence(
-          symbol,
-          timeFrame
-        );
-      }
+      // if (rsiBullishDivergenceFormed) {
+      //   this.messageConstructService.notifyRsiBullishDivergence(
+      //     symbol,
+      //     timeFrame
+      //   );
+      // }
 
       return rsiBullishDivergenceFormed;
     } else {
@@ -166,43 +147,56 @@ export class AnalyzeStrategyService {
     }
   }
 
-  public bollingerBandNearBottom(
+  public bollingerBandBullishBottom(
     inputValues: number[],
     bbResults: BollingerBandsOutput[],
     symbol: string,
     timeFrame: ChartTimeframe
   ): boolean {
-    if (bbResults.length > 10) {
-      let lastBbValue = bbResults[bbResults.length - 2];
+    if (bbResults.length > 55) {
+      let bbBottomValues: number[] = [];
+
+      for (let index = 55; index > 0; index--) {
+        bbBottomValues.push(bbResults[bbResults.length - index].lower);
+      }
+
+      let bbBottomRegressionIsBullish = this.linearRegressionIsNotBearish(
+        bbBottomValues,
+        50
+      );
+
       let currentBbValue = bbResults[bbResults.length - 1];
       let currentTradingPrice = inputValues[inputValues.length - 1];
       let lastTradingPrice = inputValues[inputValues.length - 2];
+      let last2ndTradingPrice = inputValues[inputValues.length - 3];
 
-      if (currentBbValue && lastBbValue) {
-        let bbCurrentlowerLimit =
-          currentBbValue.middle -
-          ((currentBbValue.middle - currentBbValue.lower) / 100) * 75;
+      let bbCurrentlowerLimit =
+        currentBbValue.middle -
+        ((currentBbValue.middle - currentBbValue.lower) / 100) * 80;
 
-        let bbCurrentIsBelowLimit = currentTradingPrice < bbCurrentlowerLimit;
-        let downPrecentage =
-          ((currentBbValue.middle - currentTradingPrice) /
-            (currentBbValue.middle - currentBbValue.lower)) *
-          100;
+      let bbCurrentIsBelowLimit = currentTradingPrice < bbCurrentlowerLimit;
 
-        let bbIsNearBottom = bbCurrentIsBelowLimit && downPrecentage < 110;
+      let downPrecentage =
+        ((currentBbValue.middle - currentTradingPrice) /
+          (currentBbValue.middle - currentBbValue.lower)) *
+        100;
 
-        if (bbCurrentIsBelowLimit) {
-          this.messageConstructService.addToSessionBBList(
-            symbol,
-            timeFrame,
-            downPrecentage
-          );
-        }
+      let priceActionTurningBullish = currentTradingPrice > lastTradingPrice;
+      priceActionTurningBullish &&= lastTradingPrice < last2ndTradingPrice;
 
-        return bbIsNearBottom;
-      } else {
-        return false;
+      let bbIsNearBottom = bbCurrentIsBelowLimit && downPrecentage < 120;
+      bbIsNearBottom &&=
+        bbBottomRegressionIsBullish && priceActionTurningBullish;
+
+      if (bbCurrentIsBelowLimit) {
+        this.messageConstructService.addToSessionBBList(
+          symbol,
+          timeFrame,
+          downPrecentage
+        );
       }
+
+      return bbIsNearBottom;
     } else {
       return false;
     }
@@ -218,7 +212,10 @@ export class AnalyzeStrategyService {
     let rsiHasEnoughData = rsiValues.length > 10;
 
     if (rsiHasEnoughData && ma200HasEnoughData) {
-      let ma200IsNotBearish = this.linearRegressionIsNotBearish(ma200Values);
+      let ma200IsNotBearish = this.linearRegressionIsNotBearish(
+        ma200Values,
+        10
+      );
 
       let lastClosed2ndRsiValue = rsiValues[rsiValues.length - 3];
       let lastClosedRsiValue = rsiValues[rsiValues.length - 2];
@@ -246,7 +243,10 @@ export class AnalyzeStrategyService {
     }
   }
 
-  private linearRegressionIsNotBearish(trendLineData: number[]) {
+  private linearRegressionIsNotBearish(
+    trendLineData: number[],
+    candleCount: number
+  ) {
     let sum_x = 0;
     let sum_y = 0;
     let sum_xy = 0;
@@ -263,7 +263,7 @@ export class AnalyzeStrategyService {
     /*
      * Calculate the sum for each of the parts necessary.
      */
-    for (var v = 10; v > 0; v--) {
+    for (var v = candleCount; v > 0; v--) {
       x = trendLineData.length - v;
       y = trendLineData[trendLineData.length - v];
       sum_x += x;

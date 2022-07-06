@@ -1,15 +1,9 @@
-import { BollingerBandsOutput } from "technicalindicators/declarations/volatility/BollingerBands";
+import { AnalyzeStrategy } from "../enums/analyze-strategies.enum";
 import { ChartTimeframe } from "../enums/chart-timeframes.enum";
 import { PriceRecordDto } from "./price-record.dto";
 
 export interface BullishCandidate {
   priceRecord: PriceRecordDto;
-  lastBollingerValue: BollingerBandsOutput;
-  lastRsiValue: number;
-  bollingerBandPercentage: number;
-  rsiBullish: boolean;
-  rsiWithMovingAverageBullish: boolean;
-  rsiBullishDivergenceFormed: boolean;
-  bollingerNearBottom: boolean;
+  strategy: AnalyzeStrategy;
   timeFrame: ChartTimeframe;
 }
