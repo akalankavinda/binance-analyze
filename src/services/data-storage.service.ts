@@ -104,14 +104,8 @@ export class DataStorageService {
 
     let chartString = "";
 
-    // await this.fetchTimeFrameChartData(
-    //   eventNumber15Minute,
-    //   DataStorageTable.table15Minute,
-    //   ChartTimeframe.FIFTEEN_MINUTE
-    // );
-
-    // once every 6 hour
-    if (eventNumber15Minute % 24 === 0) {
+    // once in the middle of every 1Day candle
+    if (eventNumber15Minute % 96 === 48) {
       chartString = `, ${ChartTimeframe.ONE_DAY}${chartString}`;
       await this.fetchTimeFrameChartData(
         eventNumber1Day,
@@ -120,8 +114,8 @@ export class DataStorageService {
       );
     }
 
-    // once every 4 hour
-    if (eventNumber15Minute % 16 === 0) {
+    // once in the middle of every 12Hour candle
+    if (eventNumber15Minute % 48 === 24) {
       chartString = `, ${ChartTimeframe.TWELVE_HOUR}${chartString}`;
       await this.fetchTimeFrameChartData(
         eventNumber12Hour,
@@ -130,8 +124,8 @@ export class DataStorageService {
       );
     }
 
-    // once every 3 hour
-    if (eventNumber15Minute % 12 === 0) {
+    // once in the middle of every 4Hour candle
+    if (eventNumber15Minute % 16 === 8) {
       chartString = `, ${ChartTimeframe.FOUR_HOUR}${chartString}`;
       await this.fetchTimeFrameChartData(
         eventNumber4Hour,
@@ -140,8 +134,8 @@ export class DataStorageService {
       );
     }
 
-    // once every 1 hour
-    if (eventNumber15Minute % 4 === 0) {
+    // once in the middle of every 2Hour candle
+    if (eventNumber15Minute % 8 === 4) {
       chartString = `, ${ChartTimeframe.TWO_HOUR}${chartString}`;
       await this.fetchTimeFrameChartData(
         eventNumber2Hour,
@@ -150,8 +144,8 @@ export class DataStorageService {
       );
     }
 
-    // once every 30 minutes
-    if (eventNumber15Minute % 2 === 0) {
+    // once in the middle of every 1Hour candle
+    if (eventNumber15Minute % 4 === 2) {
       chartString = `, ${ChartTimeframe.ONE_HOUR}${chartString}`;
       await this.fetchTimeFrameChartData(
         eventNumber1Hour,
@@ -160,17 +154,25 @@ export class DataStorageService {
       );
     }
 
-    chartString = ` ${ChartTimeframe.THIRTY_MINUTE}${chartString}`;
-    await this.fetchTimeFrameChartData(
-      eventNumber30Minute,
-      DataStorageTable.table30Minute,
-      ChartTimeframe.THIRTY_MINUTE
-    );
+    // once in the middle of every 30Minute candle
+    if (eventNumber15Minute % 2 === 1) {
+      chartString = ` ${ChartTimeframe.THIRTY_MINUTE}${chartString}`;
+      await this.fetchTimeFrameChartData(
+        eventNumber30Minute,
+        DataStorageTable.table30Minute,
+        ChartTimeframe.THIRTY_MINUTE
+      );
+    }
 
-    this.logWriter.info(`analyzing chart data:${chartString}`);
-    // once every 1 hour
-    if (eventNumber15Minute % 4 === 0) {
+    // once in the middle of every 1Hour candle
+    if (eventNumber15Minute % 4 === 2) {
       await this.dataAnalyzeService.finishCurrentSessionProcessing();
+    }
+
+    if (chartString.length > 0) {
+      this.logWriter.info(`analyzing chart data:${chartString}`);
+    } else {
+      this.logWriter.info(`analyzing skipped`);
     }
   }
 

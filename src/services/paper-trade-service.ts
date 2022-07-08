@@ -452,15 +452,15 @@ export class PaperTradeService {
       }
     } else if (strategy === AnalyzeStrategy.RSI_BULLISH_DIVERGENCE) {
       if (timeFrame === ChartTimeframe.TWO_HOUR) {
-        stopProfitPercentage = 3;
-      } else if (timeFrame === ChartTimeframe.FOUR_HOUR) {
         stopProfitPercentage = 5;
+      } else if (timeFrame === ChartTimeframe.FOUR_HOUR) {
+        stopProfitPercentage = 10;
       } else if (timeFrame === ChartTimeframe.TWELVE_HOUR) {
-        stopProfitPercentage = 8;
+        stopProfitPercentage = 15;
       } else if (timeFrame === ChartTimeframe.ONE_DAY) {
-        stopProfitPercentage = 14;
+        stopProfitPercentage = 20;
       } else {
-        stopProfitPercentage = 2;
+        stopProfitPercentage = 3;
       }
     }
 
