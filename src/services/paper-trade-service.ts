@@ -1,7 +1,6 @@
 import { ChartData } from "../models/chart-data";
 import { PaperTrade } from "../models/paper-trade";
 import { BullishCandidate } from "../models/bullish-candidate.model";
-import { PriceRecordDto } from "../models/price-record.dto";
 import { DataAnalyzeService } from "./data-analyze.service";
 import { DataStorageService } from "./data-storage.service";
 import { LogWriterService } from "./log-writer.service";
@@ -29,20 +28,15 @@ export class PaperTradeService {
   private messageConstructService = MessageConstructService.getInstance();
   private logWriter = LogWriterService.getInstance();
 
-  private minTradeAmountUsd: number = 50;
-  private startingAmountUsd: number = 1000;
-  private currentBalanceUsd!: number;
+  private minTradeAmountUsd: number = 100;
   private minProfitPercentage = 0.5;
   private tradeFeePercentage: number = 0.1;
   private buyBuffer: number = 0.125;
   private tradeExpireTime = 1000 * 60 * 60; // one hour
-
-  private bollingerBandProfitPercentage = 20;
-  private bollingerBandLossPercentage = 35;
-  private rsiDivergenceProfitPercentage = 100;
-  private rsiDivergenceLossPercentage = 30;
+  private sessionOrderPlaceLimit = 2;
 
   // memory storage variables
+  private currentBalanceUsd = 0;
   private profitTradeCount = 0;
   private totalTradeCount = 0;
   private totalProfit = 0;
@@ -53,46 +47,73 @@ export class PaperTradeService {
   private recentOrderStatusStack: OrderCompleteStatus[] = [];
 
   constructor() {
-    this.currentBalanceUsd = this.startingAmountUsd;
+    this.loadPreviousTradesFromFile();
     this.startPaperTrading();
+  }
+
+  private loadPreviousTradesFromFile() {
+    this.currentBalanceUsd =
+      this.dataStorageService.loadDataFromJsonStorage("currentBalanceUsd");
+    this.profitTradeCount =
+      this.dataStorageService.loadDataFromJsonStorage("profitTradeCount");
+    this.totalTradeCount =
+      this.dataStorageService.loadDataFromJsonStorage("totalTradeCount");
+    this.totalProfit =
+      this.dataStorageService.loadDataFromJsonStorage("totalProfit");
+    this.pendingBuyOrders =
+      this.dataStorageService.loadDataFromJsonStorage("pendingBuyOrders");
+    this.pendingSellOrders =
+      this.dataStorageService.loadDataFromJsonStorage("pendingSellOrders");
+    this.recentlyLostSymbolList =
+      this.dataStorageService.loadDataFromJsonStorage("recentlyLostSymbolList");
+    this.placingRealOrdersAllowed =
+      this.dataStorageService.loadDataFromJsonStorage(
+        "placingRealOrdersAllowed"
+      );
+    this.recentOrderStatusStack =
+      this.dataStorageService.loadDataFromJsonStorage("recentOrderStatusStack");
   }
 
   public startPaperTrading() {
     this.dataAnalyzeService.oppotunityBroadcaster$.subscribe(
       async (tradeSource: PaperTradeSouce) => {
         await this.sellIfTimeFrameIsBearish(tradeSource.bearishList);
-
-        tradeSource.bullishList.forEach((tradeSource: BullishCandidate) => {
-          this.placePendingBuyOrder(tradeSource);
-        });
+        this.placePendingBuyOrder(tradeSource);
+        await this.messageConstructService.constructAndSendBuySignalMessage();
       }
     );
 
     this.dataStorageService.data1MinuteBroadcaster$.subscribe(
       async (latestData: ChartData) => {
-        await this.triggerActiveSellOrders(latestData);
         await this.triggerPendingBuyOrders(latestData);
+        await this.triggerActiveSellOrders(latestData);
+
+        await this.messageConstructService.constructAndSendOrderSoldMessage();
+        await this.messageConstructService.constructAndSendBuyOrderHitMessage();
+        await this.messageConstructService.constructAndSendOrderExpiredMessage();
       }
     );
 
-    this.dataAnalyzeService.sessionFinishBroadcaster$.subscribe((val) => {
+    this.dataAnalyzeService.session1HourEndBroadcaster$.subscribe((val) => {
       this.sendAccountUpdate();
     });
 
     this.logWriter.info("started paper trading");
   }
 
-  private placePendingBuyOrder(bullishCandidate: BullishCandidate) {
-    let symbol = bullishCandidate.priceRecord.symbol;
-    let currentPrice = bullishCandidate.priceRecord.close;
-    let timeFrame = bullishCandidate.timeFrame;
+  private placePendingBuyOrder(tradeSource: PaperTradeSouce) {
+    let placedCount = 0;
 
-    let tradingIsPaused = !this.placingRealOrdersAllowed;
-    let symbolRecentlyLost = this.hasRecentlyLost(symbol);
-    let noPendingBuyOrders = !this.hasPendingBuyOrder(symbol, timeFrame);
-    let noPendingSellOrders = !this.hasPendingSellOrder(symbol, timeFrame);
+    tradeSource.bullishList.forEach((bullishCandidate: BullishCandidate) => {
+      let symbol = bullishCandidate.priceRecord.symbol;
+      let currentPrice = bullishCandidate.priceRecord.close;
+      let timeFrame = bullishCandidate.timeFrame;
 
-    if (noPendingBuyOrders && noPendingSellOrders) {
+      let tradingIsPaused = !this.placingRealOrdersAllowed;
+      let symbolRecentlyLost = this.hasRecentlyLost(symbol);
+      let noPendingBuyOrders = !this.hasPendingBuyOrder(symbol, timeFrame);
+      let noPendingSellOrders = !this.hasPendingSellOrder(symbol, timeFrame);
+
       let strategy = bullishCandidate.strategy;
       let buyPrice: number = (currentPrice / 100) * (100 - this.buyBuffer);
 
@@ -110,19 +131,27 @@ export class PaperTradeService {
 
       let tradeIsHidden = symbolRecentlyLost || tradingIsPaused;
 
-      if (stopProfit >= minProfitSellPrice) {
-        let newTrade: PaperTrade = {
-          symbol: symbol,
-          amount: Utils.roundNum(buyAmount),
-          buyPrice: Utils.roundNum(buyPrice),
-          stopLoss: Utils.roundNum(stopLoss),
-          stopProfit: Utils.roundNum(stopProfit),
-          isHiddenTrade: tradeIsHidden,
-          timeFrame: bullishCandidate.timeFrame,
-          timestamp: new Date().getTime(),
-          strategy: strategy,
-        };
+      let newTrade: PaperTrade = {
+        symbol: symbol,
+        amount: Utils.roundNum(buyAmount),
+        buyPrice: Utils.roundNum(buyPrice),
+        currentPrice: Utils.roundNum(buyPrice),
+        stopLoss: Utils.roundNum(stopLoss),
+        stopProfit: Utils.roundNum(stopProfit),
+        isHiddenTrade: tradeIsHidden,
+        timeFrame: bullishCandidate.timeFrame,
+        timestamp: new Date().getTime(),
+        strategy: strategy,
+      };
 
+      if (
+        noPendingBuyOrders &&
+        noPendingSellOrders &&
+        stopProfit >= minProfitSellPrice &&
+        placedCount <= this.sessionOrderPlaceLimit
+      ) {
+        // if there is already pending the same symbol
+        // and have a better position to place order..
         this.pendingBuyOrders.forEach((item, index) => {
           if (
             item.symbol === newTrade.symbol &&
@@ -134,20 +163,27 @@ export class PaperTradeService {
         });
 
         this.pendingBuyOrders.push(newTrade);
+        placedCount += 1;
 
-        if (!tradeIsHidden) {
-          this.messageConstructService.addToSessionSignalsList(
-            newTrade,
-            bullishCandidate
-          );
-        }
+        this.dataStorageService.saveDataToJsonStorage(
+          "pendingBuyOrders",
+          this.pendingBuyOrders
+        );
       }
-    }
+
+      // add possible trade opportunity to signal list
+      if (!symbolRecentlyLost) {
+        this.messageConstructService.addToSessionSignalsList(
+          newTrade,
+          bullishCandidate
+        );
+      }
+    });
   }
 
-  private async sellActiveOrder(tradeIndex: number, sellPrice: number) {
+  private async sellActiveOrder(tradeIndex: number) {
     let trade = this.pendingSellOrders[tradeIndex];
-    let stopProfitIsHit = sellPrice >= trade.stopProfit;
+    let stopProfitIsHit = trade.currentPrice >= trade.stopProfit;
 
     if (stopProfitIsHit) {
       this.removeFromRecentlyLostSymbolList(trade.symbol);
@@ -157,13 +193,22 @@ export class PaperTradeService {
       this.pushToRecentOrderStatusStack(OrderCompleteStatus.failed);
     }
 
-    let soldAmountUSD = Utils.roundNum(trade.amount * sellPrice);
+    this.dataStorageService.saveDataToJsonStorage(
+      "recentlyLostSymbolList",
+      this.recentlyLostSymbolList
+    );
+    this.dataStorageService.saveDataToJsonStorage(
+      "recentOrderStatusStack",
+      this.recentOrderStatusStack
+    );
+
+    let soldAmountUSD = Utils.roundNum(trade.amount * trade.currentPrice);
 
     let hiddenText = trade.isHiddenTrade ? " HIDDEN" : "";
     this.logWriter.info(
       `PAPER TRADE:${hiddenText} SELL ${Utils.trimUSDT(trade.symbol)}-${
         trade.timeFrame
-      } at price ${Utils.roundNum(sellPrice)} for ${Utils.roundNum(
+      } at price ${Utils.roundNum(trade.currentPrice)} for ${Utils.roundNum(
         soldAmountUSD
       )}USD`
     );
@@ -185,13 +230,35 @@ export class PaperTradeService {
         )}USD @ succress rate: ${this.profitTradeCount}/${this.totalTradeCount}`
       );
 
-      await this.messageConstructService.notifySellTrade(
+      this.dataStorageService.saveDataToJsonStorage(
+        "profitTradeCount",
+        this.profitTradeCount
+      );
+      this.dataStorageService.saveDataToJsonStorage(
+        "totalTradeCount",
+        this.totalTradeCount
+      );
+      this.dataStorageService.saveDataToJsonStorage(
+        "totalProfit",
+        this.totalProfit
+      );
+
+      this.messageConstructService.addToSessionOrderSoldList(
         trade,
         stopProfitIsHit
       );
     }
 
     this.pauseOrResumePlacingNewOrders();
+
+    this.dataStorageService.saveDataToJsonStorage(
+      "pendingSellOrders",
+      this.pendingSellOrders
+    );
+    this.dataStorageService.saveDataToJsonStorage(
+      "pendingBuyOrders",
+      this.pendingBuyOrders
+    );
   }
 
   // when price hits the buying price, trigger the pending buy order
@@ -203,6 +270,8 @@ export class PaperTradeService {
           let livePrice = latestData[buyOrder.symbol][0].close;
           let buyPriceHit = livePrice <= buyOrder.buyPrice;
           let currenTimeStamp = new Date().getTime();
+
+          this.pendingBuyOrders[buyOrderIndex].currentPrice = livePrice;
 
           if (balanceIsEnough && buyPriceHit) {
             this.pendingSellOrders.push(buyOrder);
@@ -239,8 +308,14 @@ export class PaperTradeService {
         }
       });
 
-      await this.messageConstructService.constructAndSendBuyOrderHitMessage();
-      await this.messageConstructService.constructAndSendOrderExpiredMessage();
+      this.dataStorageService.saveDataToJsonStorage(
+        "pendingBuyOrders",
+        this.pendingBuyOrders
+      );
+      this.dataStorageService.saveDataToJsonStorage(
+        "pendingSellOrders",
+        this.pendingSellOrders
+      );
     }
   }
 
@@ -254,8 +329,10 @@ export class PaperTradeService {
             let stopLossIsHit = livePrice <= trade.stopLoss;
             let stopProfitIsHit = livePrice >= trade.stopProfit;
 
+            this.pendingSellOrders[index].currentPrice = livePrice;
+
             if (stopLossIsHit || stopProfitIsHit) {
-              await this.sellActiveOrder(index, livePrice);
+              await this.sellActiveOrder(index);
             }
           }
         }
@@ -271,10 +348,7 @@ export class PaperTradeService {
           activeTrade.symbol === bearItem.symbol &&
           activeTrade.timeFrame === bearItem.timeFrame
         ) {
-          await this.sellActiveOrder(
-            activeTradeIndex,
-            bearItem.lastPriceRecord.close
-          );
+          await this.sellActiveOrder(activeTradeIndex);
         }
       });
     });
@@ -282,7 +356,7 @@ export class PaperTradeService {
 
   ///////////////////////////////////////////
 
-  public async sendAccountUpdate() {
+  private async sendAccountUpdate() {
     let pendingSellOrderCount = 0;
     let pendingBuyOrderCount = 0;
     this.pendingSellOrders.forEach((item) => {
@@ -296,7 +370,6 @@ export class PaperTradeService {
       }
     });
 
-    await this.messageConstructService.constructAndSendBuySignalMessage();
     await this.messageConstructService.notifyAccountUpdate(
       this.totalProfit,
       this.profitTradeCount,
@@ -308,7 +381,7 @@ export class PaperTradeService {
     );
   }
 
-  private pauseOrResumePlacingNewOrders() {
+  private async pauseOrResumePlacingNewOrders() {
     if (this.recentOrderStatusStack.length > 3) {
       if (this.placingRealOrdersAllowed) {
         let atLeastOneTradeSucceeded =
@@ -318,10 +391,11 @@ export class PaperTradeService {
 
         if (!atLeastOneTradeSucceeded) {
           this.placingRealOrdersAllowed = false;
-          this.makeAllPendingOrdersHidden();
-          this.reduceRiskForActiveTrades();
           this.logWriter.info(`PAUSED PLACING NEW ORDERS`);
-          this.messageConstructService.notifyTradesPaused();
+          this.logWriter.info(`SELLING ALL ACTIVE ORDERS TO MINIMIZE RISK`);
+          await this.messageConstructService.notifyTradesPaused();
+          this.makeAllPendingOrdersHidden();
+          this.immediatelySellActiveOrders();
         }
       } else {
         let tradesSucceededInRow =
@@ -336,14 +410,18 @@ export class PaperTradeService {
           this.messageConstructService.notifyTradesResumed();
         }
       }
+
+      this.dataStorageService.saveDataToJsonStorage(
+        "placingRealOrdersAllowed",
+        this.placingRealOrdersAllowed
+      );
     }
   }
 
   private makeAllPendingOrdersHidden() {
-    // this.pendingBuyOrders.forEach((item, index) => {
-    //   this.pendingBuyOrders[index].isHiddenTrade = true;
-    // });
-    this.pendingBuyOrders = [];
+    this.pendingBuyOrders.forEach((item, index) => {
+      this.pendingBuyOrders[index].isHiddenTrade = true;
+    });
   }
 
   private makeAllPendingOrdersVisible() {
@@ -352,10 +430,9 @@ export class PaperTradeService {
     });
   }
 
-  private reduceRiskForActiveTrades() {
+  private immediatelySellActiveOrders() {
     this.pendingSellOrders.forEach((item, index) => {
-      let newStopLoss = (item.buyPrice / 100) * 98;
-      this.pendingSellOrders[index].stopLoss = newStopLoss;
+      this.sellActiveOrder(index);
     });
   }
 
@@ -395,7 +472,7 @@ export class PaperTradeService {
     this.pendingSellOrders.forEach((item) => {
       if (
         item.symbol === symbol &&
-        item.timeFrame === timeframe &&
+        //item.timeFrame === timeframe &&
         item.isHiddenTrade === false
       ) {
         hasTrades = true;
@@ -412,7 +489,7 @@ export class PaperTradeService {
     this.pendingBuyOrders.forEach((item) => {
       if (
         item.symbol === symbol &&
-        item.timeFrame === timeframe &&
+        //item.timeFrame === timeframe &&
         item.isHiddenTrade === false
       ) {
         hasTrades = true;
@@ -439,10 +516,12 @@ export class PaperTradeService {
       strategy === AnalyzeStrategy.BOLLINGER_BAND_BULLISH ||
       strategy === AnalyzeStrategy.RSI_WITH_MA_BULLISH
     ) {
-      if (timeFrame === ChartTimeframe.TWO_HOUR) {
-        stopProfitPercentage = 1.75;
+      if (timeFrame === ChartTimeframe.ONE_HOUR) {
+        stopProfitPercentage = 1;
+      } else if (timeFrame === ChartTimeframe.TWO_HOUR) {
+        stopProfitPercentage = 1.5;
       } else if (timeFrame === ChartTimeframe.FOUR_HOUR) {
-        stopProfitPercentage = 3;
+        stopProfitPercentage = 2.5;
       } else if (timeFrame === ChartTimeframe.TWELVE_HOUR) {
         stopProfitPercentage = 5;
       } else if (timeFrame === ChartTimeframe.ONE_DAY) {
@@ -451,16 +530,18 @@ export class PaperTradeService {
         stopProfitPercentage = 1;
       }
     } else if (strategy === AnalyzeStrategy.RSI_BULLISH_DIVERGENCE) {
-      if (timeFrame === ChartTimeframe.TWO_HOUR) {
-        stopProfitPercentage = 5;
-      } else if (timeFrame === ChartTimeframe.FOUR_HOUR) {
-        stopProfitPercentage = 10;
-      } else if (timeFrame === ChartTimeframe.TWELVE_HOUR) {
-        stopProfitPercentage = 15;
-      } else if (timeFrame === ChartTimeframe.ONE_DAY) {
-        stopProfitPercentage = 20;
-      } else {
+      if (timeFrame === ChartTimeframe.ONE_HOUR) {
+        stopProfitPercentage = 2;
+      } else if (timeFrame === ChartTimeframe.TWO_HOUR) {
         stopProfitPercentage = 3;
+      } else if (timeFrame === ChartTimeframe.FOUR_HOUR) {
+        stopProfitPercentage = 5;
+      } else if (timeFrame === ChartTimeframe.TWELVE_HOUR) {
+        stopProfitPercentage = 10;
+      } else if (timeFrame === ChartTimeframe.ONE_DAY) {
+        stopProfitPercentage = 15;
+      } else {
+        stopProfitPercentage = 2;
       }
     }
 
@@ -482,10 +563,12 @@ export class PaperTradeService {
       strategy === AnalyzeStrategy.RSI_WITH_MA_BULLISH ||
       strategy === AnalyzeStrategy.RSI_BULLISH_DIVERGENCE
     ) {
-      if (timeFrame === ChartTimeframe.TWO_HOUR) {
-        stopLossPercentage = 5.25;
+      if (timeFrame === ChartTimeframe.ONE_HOUR) {
+        stopLossPercentage = 3;
+      } else if (timeFrame === ChartTimeframe.TWO_HOUR) {
+        stopLossPercentage = 4.5;
       } else if (timeFrame === ChartTimeframe.FOUR_HOUR) {
-        stopLossPercentage = 9;
+        stopLossPercentage = 7.5;
       } else if (timeFrame === ChartTimeframe.TWELVE_HOUR) {
         stopLossPercentage = 15;
       } else if (timeFrame === ChartTimeframe.ONE_DAY) {

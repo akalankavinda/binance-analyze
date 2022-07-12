@@ -24,6 +24,7 @@ export class MessageConstructService {
   //
   private sessionBuySignalsMessage = "";
   private sessionBuyOrderHitMessage = "";
+  private sessionSellOrderHitMessage = "";
   private sessionOrderExpiredMessage = "";
 
   //
@@ -117,6 +118,17 @@ export class MessageConstructService {
     this.sessionOrderExpiredMessage += message;
   }
 
+  public addToSessionOrderSoldList(trade: PaperTrade, isProfit: boolean): void {
+    let message = isProfit
+      ? `✅ <b>${trimUSDT(trade.symbol)} - ${
+          trade.timeFrame
+        }</b> trade hit profit\n`
+      : `⛔️ <b>${trimUSDT(trade.symbol)} - ${
+          trade.timeFrame
+        }</b> trade lost\n`;
+    this.sessionSellOrderHitMessage += message;
+  }
+
   //
   //
   ////////////////////////////////////////////
@@ -150,6 +162,16 @@ export class MessageConstructService {
         TelegramChannels.paperTradeChannel
       );
       this.sessionOrderExpiredMessage = "";
+    }
+  }
+
+  public async constructAndSendOrderSoldMessage() {
+    if (this.sessionSellOrderHitMessage.length > 0) {
+      await this.telegramService.pushMessage(
+        this.sessionSellOrderHitMessage,
+        TelegramChannels.paperTradeChannel
+      );
+      this.sessionSellOrderHitMessage = "";
     }
   }
 
@@ -226,7 +248,7 @@ export class MessageConstructService {
   }
 
   public async notifyTradesPaused() {
-    let message = `⏸ Paused placing new orders`;
+    let message = `⏸ Paused placing new orders\nSelling all active orders to minimize risk..`;
     await this.telegramService.pushMessage(
       message,
       TelegramChannels.paperTradeChannel

@@ -1,5 +1,7 @@
 import { BollingerBandsOutput } from "technicalindicators/declarations/volatility/BollingerBands";
 import { ChartTimeframe } from "../enums/chart-timeframes.enum";
+import { BearishCandidate } from "../models/bearish-candidate.model";
+import { BullishCandidate } from "../models/bullish-candidate.model";
 import { RsiWithPrice } from "../models/rsi-with-price.mode";
 import { MessageConstructService } from "./message-construct-service";
 
@@ -202,20 +204,40 @@ export class AnalyzeStrategyService {
     }
   }
 
+  public bollingerBandNearTopBand(
+    inputValues: number[],
+    bbResults: BollingerBandsOutput[]
+  ): boolean {
+    if (bbResults.length > 55) {
+      let currentBbValue = bbResults[bbResults.length - 1];
+      let currentTradingPrice = inputValues[inputValues.length - 1];
+
+      let bbCurrentUpperLimit =
+        currentBbValue.middle +
+        ((currentBbValue.upper - currentBbValue.middle) / 100) * 50;
+
+      let bbCurrentIsAboveLimit = currentTradingPrice > bbCurrentUpperLimit;
+
+      return bbCurrentIsAboveLimit;
+    } else {
+      return false;
+    }
+  }
+
   public rsiWithMovingAverageIsBullish(
     rsiValues: number[],
-    ma200Values: number[],
+    sma50Values: number[],
+    sma200Values: number[],
     symbol: string,
     timeFrame: ChartTimeframe
   ) {
-    let ma200HasEnoughData = ma200Values.length > 10;
+    let ma200HasEnoughData = sma200Values.length > 10;
     let rsiHasEnoughData = rsiValues.length > 10;
 
     if (rsiHasEnoughData && ma200HasEnoughData) {
-      let ma200IsNotBearish = this.linearRegressionIsNotBearish(
-        ma200Values,
-        10
-      );
+      let sma50above200 =
+        sma50Values[sma50Values.length - 1] >
+        sma200Values[sma200Values.length - 1];
 
       let lastClosed2ndRsiValue = rsiValues[rsiValues.length - 3];
       let lastClosedRsiValue = rsiValues[rsiValues.length - 2];
@@ -228,7 +250,7 @@ export class AnalyzeStrategyService {
       let currentValueIsStillGoodToBuy = currentRsiValue < 40;
 
       if (
-        ma200IsNotBearish &&
+        sma50above200 &&
         lastClosed2ndCandleIsBearish &&
         lastClosedCandleIsOverSold &&
         currentCandlesIsBullish &&
@@ -297,5 +319,51 @@ export class AnalyzeStrategyService {
       result_values_y[result_values_y.length - 1] >= result_values_y[0];
 
     return trendLineIsNotBearish;
+  }
+
+  public findBestOpportunity(
+    bullishList: BullishCandidate[],
+    bearishList: BearishCandidate[],
+    downCoinsOnly: boolean,
+    limit: number = 1
+  ) {
+    // remove bearish trending items
+    let filteredBullishList = bullishList.filter((bullItem) => {
+      let isBullish = true;
+      bearishList.forEach((bearItem) => {
+        if (
+          bullItem.priceRecord.symbol === bearItem.symbol &&
+          bullItem.timeFrame === bearItem.timeFrame
+        ) {
+          isBullish = false;
+        }
+      });
+      return isBullish;
+    });
+
+    // depending on the BTC position filter coins
+    filteredBullishList = filteredBullishList.filter((bullItem) => {
+      let allowedToPass = false;
+      if (downCoinsOnly) {
+        if (bullItem.priceRecord.symbol.includes("DOWN")) {
+          allowedToPass = true;
+        }
+      } else {
+        if (!bullItem.priceRecord.symbol.includes("DOWN")) {
+          allowedToPass = true;
+        }
+      }
+      return allowedToPass;
+    });
+
+    // sort by opportunity
+    filteredBullishList.sort(function (a, b) {
+      let calculatedValue: number =
+        a.currentRsiValue * a.currentBollingerBandPercentageFromBottom -
+        b.currentRsiValue * b.currentBollingerBandPercentageFromBottom;
+      return calculatedValue;
+    });
+
+    return filteredBullishList.splice(0, limit);
   }
 }

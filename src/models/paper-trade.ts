@@ -5,6 +5,7 @@ export interface PaperTrade {
   symbol: string;
   amount: number;
   buyPrice: number;
+  currentPrice: number;
   stopLoss: number;
   stopProfit: number;
   isHiddenTrade: boolean;

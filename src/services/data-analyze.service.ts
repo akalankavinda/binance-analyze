@@ -18,18 +18,17 @@ export class DataAnalyzeService {
   private static _instance: DataAnalyzeService;
 
   private analyzeStrategyService = AnalyzeStrategyService.getInstance();
-  private messageConstructService = MessageConstructService.getInstance();
-  private logWriter = LogWriterService.getInstance();
 
-  private recordHistoryLimit = Number(process.env.EVENT_HISTORY_READ_LIMIT);
   private bullishCandidateList: BullishCandidate[] = [];
   private bearishCandidateList: BearishCandidate[] = [];
   private selectedSymbolList: string[] = [];
+  private tradeOnlyDownCoins = false;
 
   public oppotunityBroadcaster$: Subject<PaperTradeSouce> =
     new Subject<PaperTradeSouce>();
 
   public sessionFinishBroadcaster$: Subject<number> = new Subject<number>();
+  public session1HourEndBroadcaster$: Subject<number> = new Subject<number>();
 
   public static getInstance() {
     return this._instance || (this._instance = new this());
@@ -59,10 +58,23 @@ export class DataAnalyzeService {
         period: 14,
       });
 
+      let sma50Results = SMA.calculate(<MAInput>{
+        values: inputValues,
+        period: 50,
+      });
+
       let sma200Results = SMA.calculate(<MAInput>{
         values: inputValues,
         period: 200,
       });
+
+      if (key === "BTCUSDT") {
+        this.tradeOnlyDownCoins =
+          this.analyzeStrategyService.bollingerBandNearTopBand(
+            inputValues,
+            bollingerBandResults
+          );
+      }
 
       let rsiBullish = false;
       let bollingerBandBullishBottom = false;
@@ -81,6 +93,7 @@ export class DataAnalyzeService {
       rsiWithMOvingAverageIsBullish =
         this.analyzeStrategyService.rsiWithMovingAverageIsBullish(
           rsiResults,
+          sma50Results,
           sma200Results,
           symbol,
           chartTimeframe
@@ -139,9 +152,13 @@ export class DataAnalyzeService {
               priceRecord: lastPriceRecord,
               strategy: selectedStrategy,
               timeFrame: chartTimeframe,
+              currentRsiValue: rsiResults[rsiResults.length - 1],
+              currentBollingerBandPercentageFromBottom: 100 - bbDownPercentage,
             };
 
-            this.bullishCandidateList.push(tmpTradeSource);
+            if (this.doesNotExistInBullishList(symbol)) {
+              this.bullishCandidateList.push(tmpTradeSource);
+            }
           }
         } else {
           this.bearishCandidateList.push(<BearishCandidate>{
@@ -154,30 +171,37 @@ export class DataAnalyzeService {
     });
   }
 
-  public async finishCurrentSessionProcessing() {
+  public async finish15MinuteSessionProcessing() {
     await this.broadcastOpportunityListForTrading();
 
     this.bullishCandidateList = [];
     this.bearishCandidateList = [];
     this.selectedSymbolList = [];
 
-    //await this.messageConstructService.constructAndSendSessionAnalysisUpdate();
     this.sessionFinishBroadcaster$.next(1);
   }
 
-  public async broadcastOpportunityListForTrading() {
-    let filteredBullishList = this.bullishCandidateList.filter((bullItem) => {
-      let notBearish = true;
-      this.bearishCandidateList.forEach((bearItem) => {
-        if (
-          bullItem.priceRecord.symbol === bearItem.symbol &&
-          bullItem.timeFrame === bearItem.timeFrame
-        ) {
-          notBearish = false;
-        }
-      });
-      return notBearish;
+  public async finish1HourSessionProcessing() {
+    this.session1HourEndBroadcaster$.next(1);
+  }
+
+  private doesNotExistInBullishList(symbol: string) {
+    let doesNotExist = true;
+    this.bullishCandidateList.forEach((item) => {
+      if (item.priceRecord.symbol === symbol) {
+        doesNotExist = false;
+      }
     });
+    return doesNotExist;
+  }
+
+  public async broadcastOpportunityListForTrading() {
+    let filteredBullishList = this.analyzeStrategyService.findBestOpportunity(
+      this.bullishCandidateList,
+      this.bearishCandidateList,
+      this.tradeOnlyDownCoins,
+      5
+    );
 
     let paperTradeSource: PaperTradeSouce = {
       bullishList: filteredBullishList,

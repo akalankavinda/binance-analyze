@@ -6,4 +6,6 @@ export interface BullishCandidate {
   priceRecord: PriceRecordDto;
   strategy: AnalyzeStrategy;
   timeFrame: ChartTimeframe;
+  currentRsiValue: number;
+  currentBollingerBandPercentageFromBottom: number;
 }
