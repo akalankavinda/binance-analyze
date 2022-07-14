@@ -135,7 +135,11 @@ export class DataStorageService {
     // }
 
     // once in the middle of every 4Hour candle
-    if (eventNumber15Minute % 16 === 4 || eventNumber15Minute % 16 === 6) {
+    if (
+      eventNumber15Minute % 16 === 4 ||
+      eventNumber15Minute % 16 === 6 ||
+      eventNumber15Minute % 16 === 8
+    ) {
       chartString = `, ${ChartTimeframe.FOUR_HOUR}${chartString}`;
       await this.fetchTimeFrameChartData(
         eventNumber4Hour,
@@ -155,7 +159,7 @@ export class DataStorageService {
     }
 
     // once in the middle of every 1Hour candle
-    if (eventNumber15Minute % 4 === 1 || eventNumber15Minute % 4 === 2) {
+    if (eventNumber15Minute % 4 === 2) {
       chartString = `, ${ChartTimeframe.ONE_HOUR}${chartString}`;
       await this.fetchTimeFrameChartData(
         eventNumber1Hour,
