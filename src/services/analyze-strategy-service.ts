@@ -226,6 +226,7 @@ export class AnalyzeStrategyService {
   }
 
   public rsiWithMovingAverageIsBullish(
+    inputValues: number[],
     rsiValues: number[],
     sma50Values: number[],
     sma200Values: number[],
@@ -240,19 +241,37 @@ export class AnalyzeStrategyService {
         sma50Values[sma50Values.length - 1] >
         sma200Values[sma200Values.length - 1];
 
+      let lastClosed4thRsiValue = rsiValues[rsiValues.length - 5];
+      let lastClosed3rdRsiValue = rsiValues[rsiValues.length - 4];
       let lastClosed2ndRsiValue = rsiValues[rsiValues.length - 3];
       let lastClosedRsiValue = rsiValues[rsiValues.length - 2];
       let currentRsiValue = rsiValues[rsiValues.length - 1];
 
-      let lastClosed2ndCandleIsBearish =
-        lastClosed2ndRsiValue > lastClosedRsiValue;
+      let lastClosed4thInputValue = inputValues[inputValues.length - 5];
+      let lastClosed3rdInputValue = inputValues[inputValues.length - 4];
+      let lastClosed2ndInputValue = inputValues[inputValues.length - 3];
+      let lastClosedInputValue = inputValues[inputValues.length - 2];
+      let currentInputValue = inputValues[inputValues.length - 1];
+
+      let priceActionFormedBullishBottom =
+        currentInputValue > lastClosedInputValue &&
+        lastClosed2ndInputValue > lastClosedInputValue &&
+        lastClosed3rdInputValue > lastClosed2ndInputValue &&
+        lastClosed4thInputValue > lastClosed3rdInputValue;
+
+      let rsiFormedBullishBottom =
+        currentRsiValue > lastClosedRsiValue &&
+        lastClosed2ndRsiValue > lastClosedRsiValue &&
+        lastClosed3rdRsiValue > lastClosed2ndRsiValue &&
+        lastClosed4thRsiValue > lastClosed3rdRsiValue;
       let lastClosedCandleIsOverSold = lastClosedRsiValue < 37.5;
       let currentCandlesIsBullish = currentRsiValue > lastClosedRsiValue + 2.5;
       let currentValueIsStillGoodToBuy = currentRsiValue < 40;
 
       if (
         sma50above200 &&
-        lastClosed2ndCandleIsBearish &&
+        priceActionFormedBullishBottom &&
+        rsiFormedBullishBottom &&
         lastClosedCandleIsOverSold &&
         currentCandlesIsBullish &&
         currentValueIsStillGoodToBuy

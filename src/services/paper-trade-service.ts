@@ -265,7 +265,7 @@ export class PaperTradeService {
       if (stopProfitIsHit) {
         this.messageConstructService.addToSessionOrderHitStopProfit(trade);
       } else if (stopLossIsHit) {
-        this.messageConstructService.addToSessionOrderHitStopProfit(trade);
+        this.messageConstructService.addToSessionOrderHitStopLoss(trade);
       } else if (trade.currentPrice >= trade.zeroLossLimit) {
         this.messageConstructService.addToSessionOrderSoldWithNoLoss(trade);
       } else if (trade.currentPrice < trade.zeroLossLimit) {
@@ -361,10 +361,10 @@ export class PaperTradeService {
         async (trade: PaperTrade, index: number) => {
           if (latestData[trade.symbol]) {
             let livePrice = latestData[trade.symbol][0].close;
+            this.pendingSellOrders[index].currentPrice = livePrice;
+
             let stopLossIsHit = livePrice <= trade.stopLoss;
             let stopProfitIsHit = livePrice >= trade.stopProfit;
-
-            this.pendingSellOrders[index].currentPrice = livePrice;
 
             if (stopLossIsHit || stopProfitIsHit) {
               await this.sellActiveOrder(index);
