@@ -92,6 +92,7 @@ export class DataAnalyzeService {
 
       rsiWithMOvingAverageIsBullish =
         this.analyzeStrategyService.rsiWithMovingAverageIsBullish(
+          inputValues,
           rsiResults,
           sma50Results,
           sma200Results,
