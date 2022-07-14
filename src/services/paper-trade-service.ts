@@ -32,8 +32,9 @@ export class PaperTradeService {
   private minProfitPercentage = 0.5;
   private tradeFeePercentage: number = 0.1;
   private buyBuffer: number = 0.125;
-  private tradeExpireTime = 1000 * 60 * 60; // one hour
-  private sessionOrderPlaceLimit = 2;
+  private sessionOrderPlaceLimit = 1;
+  private activeOrderLimit = 3;
+  private pendingBuyOrderExpireHours = 1;
 
   // memory storage variables
   private currentBalanceUsd = 0;
@@ -109,6 +110,17 @@ export class PaperTradeService {
       let currentPrice = bullishCandidate.priceRecord.close;
       let timeFrame = bullishCandidate.timeFrame;
 
+      if (
+        symbol === "BTCUSDT" &&
+        bullishCandidate.strategy == AnalyzeStrategy.RSI_BULLISH_DIVERGENCE
+      ) {
+        // temporary increase active order limit
+        this.activeOrderLimit = 10;
+        setTimeout(() => {
+          this.activeOrderLimit = 3;
+        }, 1000 * 60 * 60 * 1);
+      }
+
       let tradingIsPaused = !this.placingRealOrdersAllowed;
       let symbolRecentlyLost = this.hasRecentlyLost(symbol);
       let noPendingBuyOrders = !this.hasPendingBuyOrder(symbol, timeFrame);
@@ -128,6 +140,7 @@ export class PaperTradeService {
       let minProfitSellPrice =
         (buyPrice / 100) *
         (100 + this.minProfitPercentage + this.tradeFeePercentage);
+      let zeroLossLimit = (buyPrice / 100) * (100 + this.tradeFeePercentage);
 
       let tradeIsHidden = symbolRecentlyLost || tradingIsPaused;
 
@@ -138,6 +151,7 @@ export class PaperTradeService {
         currentPrice: Utils.roundNum(buyPrice),
         stopLoss: Utils.roundNum(stopLoss),
         stopProfit: Utils.roundNum(stopProfit),
+        zeroLossLimit: Utils.roundNum(zeroLossLimit),
         isHiddenTrade: tradeIsHidden,
         timeFrame: bullishCandidate.timeFrame,
         timestamp: new Date().getTime(),
@@ -162,7 +176,7 @@ export class PaperTradeService {
           }
         });
 
-        this.pendingBuyOrders.push(newTrade);
+        this.pendingBuyOrders.unshift(newTrade);
         placedCount += 1;
 
         this.dataStorageService.saveDataToJsonStorage(
@@ -184,11 +198,12 @@ export class PaperTradeService {
   private async sellActiveOrder(tradeIndex: number) {
     let trade = this.pendingSellOrders[tradeIndex];
     let stopProfitIsHit = trade.currentPrice >= trade.stopProfit;
+    let stopLossIsHit = trade.currentPrice <= trade.stopLoss;
 
     if (stopProfitIsHit) {
       this.removeFromRecentlyLostSymbolList(trade.symbol);
       this.pushToRecentOrderStatusStack(OrderCompleteStatus.success);
-    } else {
+    } else if (stopLossIsHit) {
       this.addToRecentlyLostSymbolList(trade.symbol);
       this.pushToRecentOrderStatusStack(OrderCompleteStatus.failed);
     }
@@ -242,11 +257,20 @@ export class PaperTradeService {
         "totalProfit",
         this.totalProfit
       );
-
-      this.messageConstructService.addToSessionOrderSoldList(
-        trade,
-        stopProfitIsHit
+      this.dataStorageService.saveDataToJsonStorage(
+        "currentBalanceUsd",
+        this.currentBalanceUsd
       );
+
+      if (stopProfitIsHit) {
+        this.messageConstructService.addToSessionOrderHitStopProfit(trade);
+      } else if (stopLossIsHit) {
+        this.messageConstructService.addToSessionOrderHitStopProfit(trade);
+      } else if (trade.currentPrice >= trade.zeroLossLimit) {
+        this.messageConstructService.addToSessionOrderSoldWithNoLoss(trade);
+      } else if (trade.currentPrice < trade.zeroLossLimit) {
+        this.messageConstructService.addToSessionOrderSoldWithLoss(trade);
+      }
     }
 
     this.pauseOrResumePlacingNewOrders();
@@ -266,6 +290,7 @@ export class PaperTradeService {
     if (this.pendingBuyOrders.length > 0) {
       this.pendingBuyOrders.forEach(async (buyOrder, buyOrderIndex) => {
         if (latestData[buyOrder.symbol]) {
+          let hasAvailableSlot = this.hasAvailableTradeSlot(buyOrder);
           let balanceIsEnough = this.balanceIsEnough();
           let livePrice = latestData[buyOrder.symbol][0].close;
           let buyPriceHit = livePrice <= buyOrder.buyPrice;
@@ -273,7 +298,7 @@ export class PaperTradeService {
 
           this.pendingBuyOrders[buyOrderIndex].currentPrice = livePrice;
 
-          if (balanceIsEnough && buyPriceHit) {
+          if (balanceIsEnough && buyPriceHit && hasAvailableSlot) {
             this.pendingSellOrders.push(buyOrder);
             this.pendingBuyOrders.splice(buyOrderIndex, 1);
 
@@ -292,10 +317,15 @@ export class PaperTradeService {
               this.messageConstructService.addToSessionBuyOrderHitList(
                 buyOrder
               );
+
+              // after one real oder is placed, make other pending orders hidden
+              this.pendingBuyOrders.forEach((item, index) => {
+                this.pendingBuyOrders[index].isHiddenTrade = true;
+              });
             }
           } else if (
             currenTimeStamp - buyOrder.timestamp >
-            this.tradeExpireTime
+            1000 * 60 * 60 * this.pendingBuyOrderExpireHours
           ) {
             // remove expired pending-buy-orders
             this.pendingBuyOrders.splice(buyOrderIndex, 1);
@@ -316,11 +346,16 @@ export class PaperTradeService {
         "pendingSellOrders",
         this.pendingSellOrders
       );
+      this.dataStorageService.saveDataToJsonStorage(
+        "currentBalanceUsd",
+        this.currentBalanceUsd
+      );
     }
   }
 
   // when price hits stopLoss or stopProfit, sell the order
   private async triggerActiveSellOrders(latestData: ChartData) {
+    let currenTimeStamp = new Date().getTime();
     if (this.pendingSellOrders.length > 0) {
       this.pendingSellOrders.forEach(
         async (trade: PaperTrade, index: number) => {
@@ -332,6 +367,12 @@ export class PaperTradeService {
             this.pendingSellOrders[index].currentPrice = livePrice;
 
             if (stopLossIsHit || stopProfitIsHit) {
+              await this.sellActiveOrder(index);
+            } else if (
+              currenTimeStamp - trade.timestamp >
+              this.getOrderExpireLimit(trade.timeFrame)
+            ) {
+              // remove expired pending-sell-orders
               await this.sellActiveOrder(index);
             }
           }
@@ -384,12 +425,10 @@ export class PaperTradeService {
   private async pauseOrResumePlacingNewOrders() {
     if (this.recentOrderStatusStack.length > 3) {
       if (this.placingRealOrdersAllowed) {
-        let atLeastOneTradeSucceeded =
-          this.recentOrderStatusStack[0] === OrderCompleteStatus.success ||
-          this.recentOrderStatusStack[1] === OrderCompleteStatus.success ||
-          this.recentOrderStatusStack[2] === OrderCompleteStatus.success;
+        let lastCompletedOrdersDidntHitStopProfit =
+          this.recentOrderStatusStack[0] === OrderCompleteStatus.failed;
 
-        if (!atLeastOneTradeSucceeded) {
+        if (lastCompletedOrdersDidntHitStopProfit) {
           this.placingRealOrdersAllowed = false;
           this.logWriter.info(`PAUSED PLACING NEW ORDERS`);
           this.logWriter.info(`SELLING ALL ACTIVE ORDERS TO MINIMIZE RISK`);
@@ -464,6 +503,20 @@ export class PaperTradeService {
     return this.currentBalanceUsd > this.minTradeAmountUsd;
   }
 
+  private hasAvailableTradeSlot(trade: PaperTrade) {
+    if (trade.isHiddenTrade) {
+      return true;
+    } else {
+      let activeOrderCount = 0;
+      this.pendingSellOrders.forEach((item) => {
+        if (!item.isHiddenTrade) {
+          activeOrderCount += 1;
+        }
+      });
+      return activeOrderCount < this.activeOrderLimit;
+    }
+  }
+
   private hasPendingSellOrder(
     symbol: string,
     timeframe: ChartTimeframe
@@ -521,9 +574,9 @@ export class PaperTradeService {
       } else if (timeFrame === ChartTimeframe.TWO_HOUR) {
         stopProfitPercentage = 1.5;
       } else if (timeFrame === ChartTimeframe.FOUR_HOUR) {
-        stopProfitPercentage = 2.5;
+        stopProfitPercentage = 2;
       } else if (timeFrame === ChartTimeframe.TWELVE_HOUR) {
-        stopProfitPercentage = 5;
+        stopProfitPercentage = 4;
       } else if (timeFrame === ChartTimeframe.ONE_DAY) {
         stopProfitPercentage = 8;
       } else {
@@ -579,5 +632,24 @@ export class PaperTradeService {
     }
 
     return (buyPrice / 100) * (100 - stopLossPercentage); // risk
+  }
+
+  private getOrderExpireLimit(timeFrame: ChartTimeframe) {
+    let hourCount = 2;
+    if (timeFrame === ChartTimeframe.ONE_HOUR) {
+      hourCount = 2;
+    } else if (timeFrame === ChartTimeframe.TWO_HOUR) {
+      hourCount = 3;
+    } else if (timeFrame === ChartTimeframe.FOUR_HOUR) {
+      hourCount = 4;
+    } else if (timeFrame === ChartTimeframe.TWELVE_HOUR) {
+      hourCount = 6;
+    } else if (timeFrame === ChartTimeframe.ONE_DAY) {
+      hourCount = 10;
+    } else {
+      hourCount = 2;
+    }
+
+    return 1000 * 60 * 60 * hourCount; // one hour
   }
 }

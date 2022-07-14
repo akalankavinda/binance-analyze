@@ -91,13 +91,14 @@ export class AnalyzeStrategyService {
         deepBottom.rsiValue < 30 && shallowBottom.rsiValue < 35;
 
       let bottomsHasEnoughCandleGap =
-        shallowBottom.candleIndex - deepBottom.candleIndex > 10;
+        shallowBottom.candleIndex - deepBottom.candleIndex > 5;
 
       let rsiBottomsShowAccendingOrder =
-        shallowBottom.rsiValue > deepBottom.rsiValue;
+        shallowBottom.rsiValue > deepBottom.rsiValue + 1;
 
       let pricesShowDescendingOrder =
-        shallowBottom.closePrice < deepBottom.closePrice;
+        shallowBottom.closePrice <
+        deepBottom.closePrice - (deepBottom.closePrice / 100) * 1;
 
       let rsiBullishDivergenceFormed =
         bottomsAreInOversoldRegion &&

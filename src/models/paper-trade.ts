@@ -8,6 +8,7 @@ export interface PaperTrade {
   currentPrice: number;
   stopLoss: number;
   stopProfit: number;
+  zeroLossLimit: number;
   isHiddenTrade: boolean;
   timeFrame: ChartTimeframe;
   strategy: AnalyzeStrategy;

@@ -24,7 +24,7 @@ export class MessageConstructService {
   //
   private sessionBuySignalsMessage = "";
   private sessionBuyOrderHitMessage = "";
-  private sessionSellOrderHitMessage = "";
+  private sessionSellOrderMessage = "";
   private sessionOrderExpiredMessage = "";
 
   //
@@ -118,15 +118,28 @@ export class MessageConstructService {
     this.sessionOrderExpiredMessage += message;
   }
 
-  public addToSessionOrderSoldList(trade: PaperTrade, isProfit: boolean): void {
-    let message = isProfit
-      ? `✅ <b>${trimUSDT(trade.symbol)} - ${
-          trade.timeFrame
-        }</b> trade hit profit\n`
-      : `⛔️ <b>${trimUSDT(trade.symbol)} - ${
-          trade.timeFrame
-        }</b> trade lost\n`;
-    this.sessionSellOrderHitMessage += message;
+  public addToSessionOrderHitStopProfit(trade: PaperTrade): void {
+    this.sessionSellOrderMessage += `✅ <b>${trimUSDT(trade.symbol)} - ${
+      trade.timeFrame
+    }</b> trade hit profit\n`;
+  }
+
+  public addToSessionOrderHitStopLoss(trade: PaperTrade): void {
+    this.sessionSellOrderMessage += `⛔️ <b>${trimUSDT(trade.symbol)} - ${
+      trade.timeFrame
+    }</b> trade lost\n`;
+  }
+
+  public addToSessionOrderSoldWithNoLoss(trade: PaperTrade): void {
+    this.sessionSellOrderMessage += `✅ <b>${trimUSDT(trade.symbol)} - ${
+      trade.timeFrame
+    }</b> trade sold\n`;
+  }
+
+  public addToSessionOrderSoldWithLoss(trade: PaperTrade): void {
+    this.sessionSellOrderMessage += `⛔️ <b>${trimUSDT(trade.symbol)} - ${
+      trade.timeFrame
+    }</b> trade sold\n`;
   }
 
   //
@@ -166,12 +179,12 @@ export class MessageConstructService {
   }
 
   public async constructAndSendOrderSoldMessage() {
-    if (this.sessionSellOrderHitMessage.length > 0) {
+    if (this.sessionSellOrderMessage.length > 0) {
       await this.telegramService.pushMessage(
-        this.sessionSellOrderHitMessage,
+        this.sessionSellOrderMessage,
         TelegramChannels.paperTradeChannel
       );
-      this.sessionSellOrderHitMessage = "";
+      this.sessionSellOrderMessage = "";
     }
   }
 
