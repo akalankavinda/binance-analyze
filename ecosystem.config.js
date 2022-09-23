@@ -3,7 +3,7 @@ module.exports = {
     {
       name: "binance_analyze",
       script: "build/main.js",
-      autorestart: false,
+      watch: false,
     },
     {
       script: "./service-worker/",

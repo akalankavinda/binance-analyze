@@ -7,31 +7,21 @@ import { ChartData } from "../models/chart-data";
 import { DataAnalyzeService } from "./data-analyze.service";
 import { ChartTimeframe } from "../enums/chart-timeframes.enum";
 import { LogWriterService } from "./log-writer.service";
+import { TradingSymbols } from "./utils";
 
 export class DataStorageService {
   private dataAnalyzeService: DataAnalyzeService =
     DataAnalyzeService.getInstance();
-  private conn!: MySql.Pool;
-  private recordHistoryLimit = Number(process.env.EVENT_HISTORY_READ_LIMIT);
   private logWriter = LogWriterService.getInstance();
 
+  private conn!: MySql.Pool;
+  private recordHistoryLimit = Number(process.env.EVENT_HISTORY_READ_LIMIT);
+
   public data1MinuteBroadcaster$: Subject<ChartData> = new Subject<ChartData>();
+  public data1HourBroadcaster$: Subject<ChartData> = new Subject<ChartData>();
 
   private last1MinuteEventNumber: number = 0;
-  private last15MinuteEventNumber: number = 0;
   private latestSymbolValues: ChartData = {};
-
-  private stableCoins = [
-    "USDC",
-    "BUSD",
-    "DAI",
-    "FRAX",
-    "TUSD",
-    "USDP",
-    "USDN",
-    "LUSD",
-    "USDD",
-  ];
 
   private static _instance: DataStorageService;
 
@@ -60,7 +50,7 @@ export class DataStorageService {
       let currentTimeStamp = new Date().getTime();
       let current1MinuteEventNumber = Math.floor(currentTimeStamp / 60000);
       this.fetch1MinuteChartData(current1MinuteEventNumber);
-    }, 10000);
+    }, 20000);
   }
 
   private async fetch1MinuteChartData(eventNumber1Minute: number) {
@@ -82,9 +72,10 @@ export class DataStorageService {
         this.data1MinuteBroadcaster$.next(this.latestSymbolValues);
       }
 
-      if (eventNumber1Minute % 15 === 0) {
-        let eventNumber15Minute = eventNumber1Minute / 15;
-        this.fetchChartData(eventNumber15Minute);
+      //this.fetchChartData(eventNumber1Minute);
+
+      if (eventNumber1Minute % 10 === 0) {
+        this.fetchChartData(eventNumber1Minute);
       }
 
       // if (eventNumber1Minute % 2 === 0) {
@@ -94,7 +85,9 @@ export class DataStorageService {
     }
   }
 
-  private async fetchChartData(eventNumber15Minute: number) {
+  private async fetchChartData(eventNumber1Minute: number) {
+    let eventNumber5Minute = Math.floor(eventNumber1Minute / 5);
+    let eventNumber15Minute = Math.floor(eventNumber5Minute / 3);
     let eventNumber30Minute = Math.floor(eventNumber15Minute / 2);
     let eventNumber1Hour = Math.floor(eventNumber30Minute / 2);
     let eventNumber2Hour = Math.floor(eventNumber1Hour / 2);
@@ -102,61 +95,105 @@ export class DataStorageService {
     let eventNumber12Hour = Math.floor(eventNumber4Hour / 2);
     let eventNumber1Day = Math.floor(eventNumber12Hour / 2);
 
-    // await this.fetchTimeFrameChartData(
-    //   eventNumber15Minute,
-    //   DataStorageTable.table15Minute,
-    //   ChartTimeframe.FIFTEEN_MINUTE
-    // );
+    let chartString = "";
 
-    await this.fetchTimeFrameChartData(
-      eventNumber30Minute,
-      DataStorageTable.table30Minute,
-      ChartTimeframe.THIRTY_MINUTE
-    );
+    // // once in the middle of every 1Day candle
+    // if (eventNumber15Minute % 96 === 24) {
+    //   chartString = `, ${ChartTimeframe.ONE_DAY}${chartString}`;
+    //   await this.fetchTimeFrameChartData(
+    //     eventNumber1Day,
+    //     DataStorageTable.table1Day,
+    //     ChartTimeframe.ONE_DAY
+    //   );
+    // }
 
-    await this.fetchTimeFrameChartData(
-      eventNumber1Hour,
-      DataStorageTable.table1Hour,
-      ChartTimeframe.ONE_HOUR
-    );
+    // // once in the middle of every 12Hour candle
+    // if (eventNumber15Minute % 48 === 12) {
+    //   chartString = `, ${ChartTimeframe.TWELVE_HOUR}${chartString}`;
+    //   await this.fetchTimeFrameChartData(
+    //     eventNumber12Hour,
+    //     DataStorageTable.table12Hour,
+    //     ChartTimeframe.TWELVE_HOUR
+    //   );
+    // }
 
-    // once every 30 minutes
-    if (eventNumber15Minute % 2 === 0) {
-      await this.fetchTimeFrameChartData(
-        eventNumber2Hour,
-        DataStorageTable.table2Hour,
-        ChartTimeframe.TWO_HOUR
-      );
+    // once in the middle of every 4Hour candle
+    if (
+      eventNumber5Minute % 48 === 2 ||
+      eventNumber5Minute % 16 === 14 ||
+      eventNumber5Minute % 16 === 26
+    ) {
     }
 
-    // once every 1 hour
-    if (eventNumber15Minute % 4 === 0) {
+    // once in the middle of every 2Hour candle
+    if (
+      eventNumber5Minute % 24 === 2 ||
+      eventNumber5Minute % 24 === 8 ||
+      eventNumber5Minute % 24 === 14
+    ) {
+    }
+
+    // once in the middle of every 1Hour candle
+    if (eventNumber5Minute % 12 === 2 || eventNumber15Minute % 12 === 8) {
+    }
+
+    // once in the middle of every 30Minute candle
+    if (eventNumber15Minute % 6 === 2) {
+    }
+
+    // once every 15Minute candle
+    // if (eventNumber5Minute % 3 === 0) {
+    if (eventNumber5Minute % 1 === 0) {
+      chartString = `, ${ChartTimeframe.FOUR_HOUR}${chartString}`;
       await this.fetchTimeFrameChartData(
         eventNumber4Hour,
         DataStorageTable.table4Hour,
         ChartTimeframe.FOUR_HOUR
       );
-    }
 
-    // once every 2 hour
-    if (eventNumber15Minute % 8 === 0) {
+      chartString = `, ${ChartTimeframe.TWO_HOUR}${chartString}`;
       await this.fetchTimeFrameChartData(
-        eventNumber12Hour,
-        DataStorageTable.table12Hour,
-        ChartTimeframe.TWELVE_HOUR
+        eventNumber2Hour,
+        DataStorageTable.table2Hour,
+        ChartTimeframe.TWO_HOUR
       );
-    }
 
-    // once every 4 hour
-    if (eventNumber15Minute % 16 === 0) {
+      chartString = `, ${ChartTimeframe.ONE_HOUR}${chartString}`;
       await this.fetchTimeFrameChartData(
-        eventNumber1Day,
-        DataStorageTable.table1Day,
-        ChartTimeframe.ONE_DAY
+        eventNumber1Hour,
+        DataStorageTable.table1Hour,
+        ChartTimeframe.ONE_HOUR
       );
+
+      chartString = ` ${ChartTimeframe.THIRTY_MINUTE}${chartString}`;
+      await this.fetchTimeFrameChartData(
+        eventNumber30Minute,
+        DataStorageTable.table30Minute,
+        ChartTimeframe.THIRTY_MINUTE
+      );
+
+      chartString = ` ${ChartTimeframe.FIFTEEN_MINUTE}${chartString}`;
+      await this.fetchTimeFrameChartData(
+        eventNumber15Minute,
+        DataStorageTable.table15Minute,
+        ChartTimeframe.FIFTEEN_MINUTE
+      );
+
+      // chartString = ` ${ChartTimeframe.FIVE_MINUTE}${chartString}`;
+      // await this.fetchTimeFrameChartData(
+      //   eventNumber5Minute,
+      //   DataStorageTable.table5Minute,
+      //   ChartTimeframe.FIVE_MINUTE
+      // );
     }
 
-    await this.dataAnalyzeService.finishCurrentSessionProcessing();
+    await this.dataAnalyzeService.finishSessionProcessing();
+
+    if (chartString.length > 0) {
+      this.logWriter.info(`analyzing chart data:${chartString}`);
+    } else {
+      this.logWriter.info(`analyzing skipped`);
+    }
   }
 
   private async fetchTimeFrameChartData(
@@ -188,19 +225,7 @@ export class DataStorageService {
       let tmpChartData: ChartData = {};
 
       typeCastedResults.forEach((priceRecord: PriceRecordDto) => {
-        // skip downcoins
-        let isDownCoin = false;
-        //isDownCoin = priceRecord.symbol.indexOf("DOWN") > 0;
-
-        //skip stablecoins
-        let isStableCoin = false;
-        this.stableCoins.forEach((item) => {
-          if (priceRecord.symbol.includes(item)) {
-            isStableCoin = true;
-          }
-        });
-
-        if (!isStableCoin && !isDownCoin) {
+        if (TradingSymbols.includes(priceRecord.symbol)) {
           if (tmpChartData[priceRecord.symbol] === undefined) {
             tmpChartData[priceRecord.symbol] = [priceRecord];
           } else {

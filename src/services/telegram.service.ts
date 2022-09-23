@@ -26,7 +26,7 @@ export class TelegraService {
     this.telegramEndpoint = `https://api.telegram.org/bot${this.telegramApiToken}/sendMessage`;
 
     this.pushMessage(
-      `🔘 Analyze bot started `,
+      `🔰 Analyze bot restarted`,
       TelegramChannels.paperTradeChannel
     );
   }
