@@ -26,49 +26,39 @@ export class DataAnalyzeService {
     chartTimeframe: ChartTimeframe
   ) {
     Object.keys(chartData).forEach((key: string) => {
-      let inputValues: number[] = [];
+      let closingPrices: number[] = [];
       let symbol = key;
 
       chartData[key].forEach((element: PriceRecordDto) => {
-        inputValues.push(element.close);
+        closingPrices.push(element.close);
       });
 
       // calculate required data to analyze chart
       let bollingerBandResults = BollingerBands.calculate({
-        values: inputValues,
+        values: closingPrices,
         period: 55,
         stdDev: 2,
       });
 
       let rsiResults = RSI.calculate({
-        values: inputValues,
+        values: closingPrices,
         period: 14,
       });
 
-      // let sma50Results = SMA.calculate(<MAInput>{
-      //   values: inputValues,
-      //   period: 50,
-      // });
-
-      // let sma200Results = SMA.calculate(<MAInput>{
-      //   values: inputValues,
-      //   period: 200,
-      // });
-
       // custom logic to analyze chart
 
-      let tmpAnalyzedResult = this.analyzeStrategyService.findOppoprtunity(
+      let tmpAnalyzedResult = this.analyzeStrategyService.findOpportunity(
         symbol,
         chartTimeframe,
         chartData[key],
-        inputValues,
+        closingPrices,
         rsiResults,
         bollingerBandResults
       );
 
       if (tmpAnalyzedResult != null) {
         if (!this.selectedSymbolList.includes(key)) {
-          let lastPrice = inputValues[inputValues.length - 1];
+          let lastPrice = closingPrices[closingPrices.length - 1];
           let lastBbValue =
             bollingerBandResults[bollingerBandResults.length - 1];
           let lastRsiValue = rsiResults[rsiResults.length - 1];
@@ -93,7 +83,7 @@ export class DataAnalyzeService {
     let filteredOpportunityList =
       this.analyzeStrategyService.filterBestOpportunities(
         this.opportunityList,
-        5
+        7
       );
 
     this.messageConstructService.constructAndSendOpportunityList(

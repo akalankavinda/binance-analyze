@@ -50,7 +50,7 @@ export class DataStorageService {
       let currentTimeStamp = new Date().getTime();
       let current1MinuteEventNumber = Math.floor(currentTimeStamp / 60000);
       this.fetch1MinuteChartData(current1MinuteEventNumber);
-    }, 20000);
+    }, 60000);
   }
 
   private async fetch1MinuteChartData(eventNumber1Minute: number) {
@@ -74,7 +74,7 @@ export class DataStorageService {
 
       //this.fetchChartData(eventNumber1Minute);
 
-      if (eventNumber1Minute % 10 === 0) {
+      if (eventNumber1Minute % 15 === 0) {
         this.fetchChartData(eventNumber1Minute);
       }
 
@@ -97,95 +97,72 @@ export class DataStorageService {
 
     let chartString = "";
 
-    // // once in the middle of every 1Day candle
-    // if (eventNumber15Minute % 96 === 24) {
-    //   chartString = `, ${ChartTimeframe.ONE_DAY}${chartString}`;
-    //   await this.fetchTimeFrameChartData(
-    //     eventNumber1Day,
-    //     DataStorageTable.table1Day,
-    //     ChartTimeframe.ONE_DAY
-    //   );
-    // }
+    // once in the middle of every 1Day candle
+    if (eventNumber15Minute % 96 === 0) {
+      chartString = `, ${ChartTimeframe.ONE_DAY}${chartString}`;
+      await this.fetchTimeFrameChartData(
+        eventNumber1Day,
+        DataStorageTable.table1Day,
+        ChartTimeframe.ONE_DAY
+      );
+    }
 
-    // // once in the middle of every 12Hour candle
-    // if (eventNumber15Minute % 48 === 12) {
-    //   chartString = `, ${ChartTimeframe.TWELVE_HOUR}${chartString}`;
-    //   await this.fetchTimeFrameChartData(
-    //     eventNumber12Hour,
-    //     DataStorageTable.table12Hour,
-    //     ChartTimeframe.TWELVE_HOUR
-    //   );
-    // }
+    // once in the middle of every 12Hour candle
+    if (eventNumber15Minute % 48 === 0) {
+      chartString = `, ${ChartTimeframe.TWELVE_HOUR}${chartString}`;
+      await this.fetchTimeFrameChartData(
+        eventNumber12Hour,
+        DataStorageTable.table12Hour,
+        ChartTimeframe.TWELVE_HOUR
+      );
+    }
 
     // once in the middle of every 4Hour candle
-    if (
-      eventNumber5Minute % 48 === 2 ||
-      eventNumber5Minute % 16 === 14 ||
-      eventNumber5Minute % 16 === 26
-    ) {
-    }
-
-    // once in the middle of every 2Hour candle
-    if (
-      eventNumber5Minute % 24 === 2 ||
-      eventNumber5Minute % 24 === 8 ||
-      eventNumber5Minute % 24 === 14
-    ) {
-    }
-
-    // once in the middle of every 1Hour candle
-    if (eventNumber5Minute % 12 === 2 || eventNumber15Minute % 12 === 8) {
-    }
-
-    // once in the middle of every 30Minute candle
-    if (eventNumber15Minute % 6 === 2) {
-    }
-
-    // once every 15Minute candle
-    // if (eventNumber5Minute % 3 === 0) {
-    if (eventNumber5Minute % 1 === 0) {
+    if (eventNumber15Minute % 16 === 0) {
       chartString = `, ${ChartTimeframe.FOUR_HOUR}${chartString}`;
       await this.fetchTimeFrameChartData(
         eventNumber4Hour,
         DataStorageTable.table4Hour,
         ChartTimeframe.FOUR_HOUR
       );
+    }
 
+    // once in the middle of every 2Hour candle
+    if (eventNumber15Minute % 8 === 0) {
       chartString = `, ${ChartTimeframe.TWO_HOUR}${chartString}`;
       await this.fetchTimeFrameChartData(
         eventNumber2Hour,
         DataStorageTable.table2Hour,
         ChartTimeframe.TWO_HOUR
       );
+    }
 
+    // once in the middle of every 1Hour candle
+    if (eventNumber15Minute % 4 === 0) {
       chartString = `, ${ChartTimeframe.ONE_HOUR}${chartString}`;
       await this.fetchTimeFrameChartData(
         eventNumber1Hour,
         DataStorageTable.table1Hour,
         ChartTimeframe.ONE_HOUR
       );
+    }
 
+    // once in the middle of every 30Minute candle
+    if (eventNumber15Minute % 2 === 0) {
       chartString = ` ${ChartTimeframe.THIRTY_MINUTE}${chartString}`;
       await this.fetchTimeFrameChartData(
         eventNumber30Minute,
         DataStorageTable.table30Minute,
         ChartTimeframe.THIRTY_MINUTE
       );
-
-      chartString = ` ${ChartTimeframe.FIFTEEN_MINUTE}${chartString}`;
-      await this.fetchTimeFrameChartData(
-        eventNumber15Minute,
-        DataStorageTable.table15Minute,
-        ChartTimeframe.FIFTEEN_MINUTE
-      );
-
-      // chartString = ` ${ChartTimeframe.FIVE_MINUTE}${chartString}`;
-      // await this.fetchTimeFrameChartData(
-      //   eventNumber5Minute,
-      //   DataStorageTable.table5Minute,
-      //   ChartTimeframe.FIVE_MINUTE
-      // );
     }
+
+    chartString = ` ${ChartTimeframe.FIFTEEN_MINUTE}${chartString}`;
+    await this.fetchTimeFrameChartData(
+      eventNumber15Minute,
+      DataStorageTable.table15Minute,
+      ChartTimeframe.FIFTEEN_MINUTE
+    );
 
     await this.dataAnalyzeService.finishSessionProcessing();
 
@@ -208,7 +185,6 @@ export class DataStorageService {
 
     if (currentTimeFrameData) {
       currentTimeFrameData = this.fillLatestSymbolData(currentTimeFrameData);
-
       this.dataAnalyzeService.analyzeData(currentTimeFrameData, timeFrame);
     }
   }

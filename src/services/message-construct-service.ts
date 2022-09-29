@@ -30,9 +30,9 @@ export class MessageConstructService {
         let strategyIcon = "🔮";
         let strategyLabel = "";
 
-        let signalIsInHistory = this.messageIsInRecentList(
-          symbolAndTimeframeText
-        );
+        // let signalIsInHistory = this.messageIsInRecentList(
+        //   symbolAndTimeframeText
+        // );
 
         if (item.strategy === AnalyzeStrategy.RSI_DIVERGENCE) {
           strategyIcon = "💎";
@@ -45,12 +45,8 @@ export class MessageConstructService {
 
         this.pushToPreviousMessages(symbolAndTimeframeText);
 
-        if (signalIsInHistory) {
-          strategyIcon = "";
-        } else {
-          tmpMessage = `${trendIcon} - ${symbolAndTimeframeText} - ${strategyIcon}${strategyLabel}\n`;
-          message += tmpMessage;
-        }
+        tmpMessage = `${trendIcon} - ${symbolAndTimeframeText} - ${strategyIcon}${strategyLabel}\n`;
+        message += tmpMessage;
       });
 
       if (message.length > 0) {
@@ -69,11 +65,11 @@ export class MessageConstructService {
     }
   }
 
-  private messageIsInRecentList(text: string): boolean {
-    return this.messageHistory.some((message) => {
-      if (message === text) {
-        return true;
-      }
-    });
-  }
+  // private messageIsInRecentList(text: string): boolean {
+  //   return this.messageHistory.some((message) => {
+  //     if (message === text) {
+  //       return true;
+  //     }
+  //   });
+  // }
 }

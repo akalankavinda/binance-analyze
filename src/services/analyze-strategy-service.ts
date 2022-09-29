@@ -6,6 +6,7 @@ import { AnalyzeStrategy } from "../enums/analyze-strategies.enum";
 import { TrendDirection } from "../enums/trend-direction.enum";
 import { PriceRecordDto } from "../models/price-record.dto";
 import { time } from "console";
+import { AnalyzedCandidate } from "../models/analyzed-candidate.model";
 
 export class AnalyzeStrategyService {
   // singleton
@@ -14,93 +15,95 @@ export class AnalyzeStrategyService {
     return this._instance || (this._instance = new this());
   }
 
-  public findOppoprtunity(
+  private analyzedCandidates: AnalyzedCandidate[] = [];
+
+  public findOpportunity(
     symbol: string,
     timeFrame: ChartTimeframe,
     candleData: PriceRecordDto[],
-    inputValues: number[],
+    closingPrices: number[],
     rsiResults: number[],
     bbResults: BollingerBandsOutput[]
   ): AnalyzeResult | null {
-    let swingPatternConfirmed = false;
     let rsiDivergenceOpportunity = this.findRsiDivergenceOpportunity(
       symbol,
       timeFrame,
-      inputValues,
+      closingPrices,
       rsiResults
     );
-    swingPatternConfirmed = this.formedSwingHighOrLow(
-      candleData,
-      rsiDivergenceOpportunity?.direction
-    );
-
-    if (rsiDivergenceOpportunity && swingPatternConfirmed) {
+    if (rsiDivergenceOpportunity) {
+      // this.pushToCandidateList(<AnalyzedCandidate>{
+      //   analyzeResult: rsiDivergenceOpportunity,
+      //   eventNumber: candleData[candleData.length - 1].event_number,
+      // });
       return rsiDivergenceOpportunity;
     }
 
-    let rsiOpportunity = this.findRsiOpportunity(symbol, timeFrame, rsiResults);
     let bbOpportunity = this.findBollingerBandOpportunity(
       symbol,
       timeFrame,
-      inputValues,
+      closingPrices,
       bbResults,
       rsiResults
     );
-    swingPatternConfirmed = this.formedSwingHighOrLow(
-      candleData,
-      bbOpportunity?.direction
-    );
-
-    // return this.overExtendedCandle(symbol, timeFrame, candleData, bbResults);
-
-    if (rsiOpportunity && bbOpportunity && swingPatternConfirmed) {
-      return <AnalyzeResult>{
-        symbol: rsiOpportunity.symbol,
-        strategy: AnalyzeStrategy.RSI_WITH_BB,
-        direction: rsiOpportunity.direction,
-        timeFrame: rsiOpportunity.timeFrame,
-      };
-    } else {
-      return null;
+    if (bbOpportunity) {
+      this.pushToCandidateList(<AnalyzedCandidate>{
+        analyzeResult: bbOpportunity,
+        eventNumber: candleData[candleData.length - 1].event_number,
+      });
     }
+
+    let analyzedResult: AnalyzeResult | null = null;
+
+    this.analyzedCandidates.forEach((candidate, index) => {
+      let symbolMatched = symbol === candidate.analyzeResult.symbol;
+      let timeFrameMatched = timeFrame === candidate.analyzeResult.timeFrame;
+      let tooLate =
+        candleData[candleData.length - 1].event_number - candidate.eventNumber >
+        10;
+      if (tooLate) {
+        this.analyzedCandidates.splice(index, 1);
+      } else {
+        if (symbolMatched && timeFrameMatched) {
+          let hasFormedSwingHighOrLow = this.formedSwingHighOrLow(
+            candleData,
+            candidate
+          );
+          if (hasFormedSwingHighOrLow) {
+            analyzedResult = candidate.analyzeResult;
+            this.analyzedCandidates.splice(index, 1);
+          }
+        }
+      }
+    });
+
+    return analyzedResult;
   }
 
-  private findRsiOpportunity(
-    symbol: string,
-    timeFrame: ChartTimeframe,
-    rsiResults: number[]
-  ): AnalyzeResult | null {
-    if (rsiResults.length > 10) {
-      let lastClosed2ndRsiValue = rsiResults[rsiResults.length - 5];
-      let lastClosedValue = rsiResults[rsiResults.length - 4];
-      let selectedCandle = rsiResults[rsiResults.length - 3];
-
-      if (selectedCandle < 27.5) {
-        return <AnalyzeResult>{
-          symbol: symbol,
-          strategy: AnalyzeStrategy.RSI,
-          direction: TrendDirection.BULLISH,
-          timeFrame: timeFrame,
-        };
-      } else if (selectedCandle > 72.5) {
-        return <AnalyzeResult>{
-          symbol: symbol,
-          strategy: AnalyzeStrategy.RSI,
-          direction: TrendDirection.BEARISH,
-          timeFrame: timeFrame,
-        };
-      } else {
-        return null;
+  private pushToCandidateList(newCandidate: AnalyzedCandidate): void {
+    let alreadyInTheList = false;
+    let listIndex = -1;
+    this.analyzedCandidates.forEach((item, index) => {
+      if (
+        item.analyzeResult.strategy === newCandidate.analyzeResult.strategy &&
+        item.analyzeResult.timeFrame === newCandidate.analyzeResult.timeFrame &&
+        item.analyzeResult.direction === newCandidate.analyzeResult.direction
+      ) {
+        alreadyInTheList = true;
+        listIndex = index;
       }
+    });
+    if (alreadyInTheList) {
+      this.analyzedCandidates[listIndex] = newCandidate;
     } else {
-      return null;
+      this.analyzedCandidates.push(newCandidate);
     }
   }
 
   private findRsiDivergenceOpportunity(
     symbol: string,
     timeFrame: ChartTimeframe,
-    inputValues: number[],
+    closingPrices: number[],
     rsiResults: number[]
   ): AnalyzeResult | null {
     if (rsiResults.length > 55) {
@@ -111,7 +114,7 @@ export class AnalyzeStrategyService {
       for (let index = 1; index < 50; index++) {
         rsiWithPriceList.push({
           rsiValue: rsiResults[rsiResults.length - index],
-          closePrice: inputValues[inputValues.length - index],
+          closePrice: closingPrices[closingPrices.length - index],
           candleIndex: rsiResults.length - index,
         });
       }
@@ -126,7 +129,7 @@ export class AnalyzeStrategyService {
 
       let secondLowestBottom: RsiWithPrice = {
         rsiValue: rsiResults[rsiResults.length - 3],
-        closePrice: inputValues[rsiResults.length - 3],
+        closePrice: closingPrices[rsiResults.length - 3],
         candleIndex: rsiResults.length - 3,
       };
 
@@ -164,7 +167,7 @@ export class AnalyzeStrategyService {
 
       let secondHighestTop: RsiWithPrice = {
         rsiValue: rsiResults[rsiResults.length - 3],
-        closePrice: inputValues[rsiResults.length - 3],
+        closePrice: closingPrices[rsiResults.length - 3],
         candleIndex: rsiResults.length - 3,
       };
 
@@ -217,11 +220,12 @@ export class AnalyzeStrategyService {
   private findBollingerBandOpportunity(
     symbol: string,
     timeFrame: ChartTimeframe,
-    inputValues: number[],
+    closingPrices: number[],
     bbResults: BollingerBandsOutput[],
     rsiResults: number[]
   ): AnalyzeResult | null {
     let timeFrameIsAbove1h =
+      timeFrame == ChartTimeframe.THIRTY_MINUTE ||
       timeFrame == ChartTimeframe.ONE_HOUR ||
       timeFrame == ChartTimeframe.TWO_HOUR ||
       timeFrame == ChartTimeframe.FOUR_HOUR ||
@@ -239,46 +243,48 @@ export class AnalyzeStrategyService {
 
       let currentRsiValue = rsiResults[rsiResults.length - 2];
       let currentBbValue = bbResults[bbResults.length - 2];
-      let currentTradingPrice = inputValues[inputValues.length - 2];
+      let currentTradingPrice = closingPrices[closingPrices.length - 2];
 
-      // let bbCurrentlowerLimit =
-      //   currentBbValue.middle -
-      //   ((currentBbValue.middle - currentBbValue.lower) / 100) * 95;
-      // let bbLoweBandLowerLimit =
-      //   currentBbValue.middle -
-      //   ((currentBbValue.middle - currentBbValue.lower) / 100) * 120;
+      let bbCurrentlowerLimit =
+        currentBbValue.middle -
+        ((currentBbValue.middle - currentBbValue.lower) / 100) * 90;
+      let bbLoweBandLowerLimit =
+        currentBbValue.middle -
+        ((currentBbValue.middle - currentBbValue.lower) / 100) * 120;
 
       let bbCurrentIsBelowLimit =
-        // currentTradingPrice < bbCurrentlowerLimit &&
-        // currentTradingPrice > bbLoweBandLowerLimit &&
-        currentTradingPrice < currentBbValue.lower && currentRsiValue < 27;
+        currentTradingPrice < bbCurrentlowerLimit &&
+        currentTradingPrice > bbLoweBandLowerLimit &&
+        currentTradingPrice < currentBbValue.lower &&
+        currentRsiValue < 27;
 
       // bearish logic
 
-      // let bbCurrentUpperLimit =
-      //   currentBbValue.middle +
-      //   ((currentBbValue.upper - currentBbValue.middle) / 100) * 95;
+      let bbCurrentUpperLimit =
+        currentBbValue.middle +
+        ((currentBbValue.upper - currentBbValue.middle) / 100) * 90;
 
-      // let bbUpperBandUpperLimit =
-      //   currentBbValue.middle +
-      //   ((currentBbValue.upper - currentBbValue.middle) / 100) * 120;
+      let bbUpperBandUpperLimit =
+        currentBbValue.middle +
+        ((currentBbValue.upper - currentBbValue.middle) / 100) * 120;
 
       let bbCurrentIsAboveLimit =
-        // currentTradingPrice > bbCurrentUpperLimit &&
-        // currentTradingPrice < bbUpperBandUpperLimit &&
-        currentTradingPrice > currentBbValue.upper && currentRsiValue > 73;
+        currentTradingPrice > bbCurrentUpperLimit &&
+        currentTradingPrice < bbUpperBandUpperLimit &&
+        currentTradingPrice > currentBbValue.upper &&
+        currentRsiValue > 73;
 
       if (bbCurrentIsBelowLimit) {
         return <AnalyzeResult>{
           symbol: symbol,
-          strategy: AnalyzeStrategy.BOLLINGER_BAND,
+          strategy: AnalyzeStrategy.RSI_WITH_BB,
           direction: TrendDirection.BULLISH,
           timeFrame: timeFrame,
         };
       } else if (bbCurrentIsAboveLimit) {
         return <AnalyzeResult>{
           symbol: symbol,
-          strategy: AnalyzeStrategy.BOLLINGER_BAND,
+          strategy: AnalyzeStrategy.RSI_WITH_BB,
           direction: TrendDirection.BEARISH,
           timeFrame: timeFrame,
         };
@@ -292,19 +298,27 @@ export class AnalyzeStrategyService {
 
   private formedSwingHighOrLow(
     candlestickData: PriceRecordDto[],
-    direction?: TrendDirection
+    candidate: AnalyzedCandidate
   ): boolean {
-    if (candlestickData.length > 5 && direction != null) {
+    let direction = candidate.analyzeResult.direction;
+
+    if (candlestickData.length > 5) {
       let selectedCandlePrev = candlestickData[candlestickData.length - 4];
       let selectedCandle = candlestickData[candlestickData.length - 3];
       let selectedCandleNext = candlestickData[candlestickData.length - 2];
 
       if (direction === TrendDirection.BULLISH) {
-        if (selectedCandle.close < selectedCandleNext.close) {
+        if (
+          selectedCandle.low < selectedCandlePrev.low &&
+          selectedCandle.low < selectedCandleNext.low
+        ) {
           return true;
         } else return false;
       } else if (direction === TrendDirection.BEARISH) {
-        if (selectedCandle.close > selectedCandleNext.close) {
+        if (
+          selectedCandle.high > selectedCandlePrev.high &&
+          selectedCandle.high > selectedCandleNext.high
+        ) {
           return true;
         } else return false;
       } else {
