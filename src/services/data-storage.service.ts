@@ -5,7 +5,7 @@ import { Subject } from "rxjs";
 import "dotenv/config";
 import { ChartData } from "../models/chart-data";
 import { DataAnalyzeService } from "./data-analyze.service";
-import { ChartTimeframe } from "../enums/chart-timeframes.enum";
+import { ChartTimeFrame } from "../enums/chart-timeframes.enum";
 import { LogWriterService } from "./log-writer.service";
 import { TradingSymbols } from "./utils";
 
@@ -78,9 +78,8 @@ export class DataStorageService {
         this.fetchChartData(eventNumber1Minute);
       }
 
-      // if (eventNumber1Minute % 2 === 0) {
-      //   let eventNumber15Minute = eventNumber1Minute / 15;
-      //   this.fetchChartData(eventNumber15Minute);
+      // if (eventNumber1Minute % 1 === 0) {
+      //   this.fetchChartData(eventNumber1Minute);
       // }
     }
   }
@@ -99,69 +98,69 @@ export class DataStorageService {
 
     // once in the middle of every 1Day candle
     if (eventNumber15Minute % 96 === 0) {
-      chartString = `, ${ChartTimeframe.ONE_DAY}${chartString}`;
+      chartString = `, ${ChartTimeFrame.ONE_DAY}${chartString}`;
       await this.fetchTimeFrameChartData(
         eventNumber1Day,
         DataStorageTable.table1Day,
-        ChartTimeframe.ONE_DAY
+        ChartTimeFrame.ONE_DAY
       );
     }
 
     // once in the middle of every 12Hour candle
     if (eventNumber15Minute % 48 === 0) {
-      chartString = `, ${ChartTimeframe.TWELVE_HOUR}${chartString}`;
+      chartString = `, ${ChartTimeFrame.TWELVE_HOUR}${chartString}`;
       await this.fetchTimeFrameChartData(
         eventNumber12Hour,
         DataStorageTable.table12Hour,
-        ChartTimeframe.TWELVE_HOUR
+        ChartTimeFrame.TWELVE_HOUR
       );
     }
 
     // once in the middle of every 4Hour candle
     if (eventNumber15Minute % 16 === 0) {
-      chartString = `, ${ChartTimeframe.FOUR_HOUR}${chartString}`;
+      chartString = `, ${ChartTimeFrame.FOUR_HOUR}${chartString}`;
       await this.fetchTimeFrameChartData(
         eventNumber4Hour,
         DataStorageTable.table4Hour,
-        ChartTimeframe.FOUR_HOUR
+        ChartTimeFrame.FOUR_HOUR
       );
     }
 
     // once in the middle of every 2Hour candle
     if (eventNumber15Minute % 8 === 0) {
-      chartString = `, ${ChartTimeframe.TWO_HOUR}${chartString}`;
+      chartString = `, ${ChartTimeFrame.TWO_HOUR}${chartString}`;
       await this.fetchTimeFrameChartData(
         eventNumber2Hour,
         DataStorageTable.table2Hour,
-        ChartTimeframe.TWO_HOUR
+        ChartTimeFrame.TWO_HOUR
       );
     }
 
     // once in the middle of every 1Hour candle
     if (eventNumber15Minute % 4 === 0) {
-      chartString = `, ${ChartTimeframe.ONE_HOUR}${chartString}`;
+      chartString = `, ${ChartTimeFrame.ONE_HOUR}${chartString}`;
       await this.fetchTimeFrameChartData(
         eventNumber1Hour,
         DataStorageTable.table1Hour,
-        ChartTimeframe.ONE_HOUR
+        ChartTimeFrame.ONE_HOUR
       );
     }
 
     // once in the middle of every 30Minute candle
     if (eventNumber15Minute % 2 === 0) {
-      chartString = ` ${ChartTimeframe.THIRTY_MINUTE}${chartString}`;
+      chartString = ` ${ChartTimeFrame.THIRTY_MINUTE}${chartString}`;
       await this.fetchTimeFrameChartData(
         eventNumber30Minute,
         DataStorageTable.table30Minute,
-        ChartTimeframe.THIRTY_MINUTE
+        ChartTimeFrame.THIRTY_MINUTE
       );
     }
 
-    chartString = ` ${ChartTimeframe.FIFTEEN_MINUTE}${chartString}`;
+    chartString = ` ${ChartTimeFrame.FIFTEEN_MINUTE}${chartString}`;
     await this.fetchTimeFrameChartData(
       eventNumber15Minute,
       DataStorageTable.table15Minute,
-      ChartTimeframe.FIFTEEN_MINUTE
+      ChartTimeFrame.FIFTEEN_MINUTE
     );
 
     await this.dataAnalyzeService.finishSessionProcessing();
@@ -176,7 +175,7 @@ export class DataStorageService {
   private async fetchTimeFrameChartData(
     eventNumber: number,
     table: DataStorageTable,
-    timeFrame: ChartTimeframe
+    timeFrame: ChartTimeFrame
   ) {
     let currentTimeFrameData = await this.fetchAndFormatData(
       table,

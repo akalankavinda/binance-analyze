@@ -1,6 +1,6 @@
 import { Subject } from "rxjs";
 import { RSI, BollingerBands } from "technicalindicators";
-import { ChartTimeframe } from "../enums/chart-timeframes.enum";
+import { ChartTimeFrame } from "../enums/chart-timeframes.enum";
 import { ChartData } from "../models/chart-data";
 import { PriceRecordDto } from "../models/price-record.dto";
 import "dotenv/config";
@@ -23,7 +23,7 @@ export class DataAnalyzeService {
 
   public async analyzeData(
     chartData: ChartData,
-    chartTimeframe: ChartTimeframe
+    chartTimeFrame: ChartTimeFrame
   ) {
     Object.keys(chartData).forEach((key: string) => {
       let closingPrices: number[] = [];
@@ -49,7 +49,7 @@ export class DataAnalyzeService {
 
       let tmpAnalyzedResult = this.analyzeStrategyService.findOpportunity(
         symbol,
-        chartTimeframe,
+        chartTimeFrame,
         chartData[key],
         closingPrices,
         rsiResults,

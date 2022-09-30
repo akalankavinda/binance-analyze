@@ -3,8 +3,8 @@ import "dotenv/config";
 import { TelegramChannels } from "../enums/telegram-channels.enum";
 import { LogWriterService } from "./log-writer.service";
 
-export class TelegraService {
-  private static _instance: TelegraService;
+export class TelegramService {
+  private static _instance: TelegramService;
 
   private logWriter = LogWriterService.getInstance();
 

@@ -1,4 +1,4 @@
-export enum ChartTimeframe {
+export enum ChartTimeFrame {
   ONE_MINUTE = "1m",
   FIVE_MINUTE = "5m",
   FIFTEEN_MINUTE = "15m",

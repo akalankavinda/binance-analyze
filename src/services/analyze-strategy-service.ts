@@ -1,5 +1,5 @@
 import { BollingerBandsOutput } from "technicalindicators/declarations/volatility/BollingerBands";
-import { ChartTimeframe } from "../enums/chart-timeframes.enum";
+import { ChartTimeFrame } from "../enums/chart-timeframes.enum";
 import { RsiWithPrice } from "../models/rsi-with-price.mode";
 import { AnalyzeResult } from "../models/analyze-result.model";
 import { AnalyzeStrategy } from "../enums/analyze-strategies.enum";
@@ -19,7 +19,7 @@ export class AnalyzeStrategyService {
 
   public findOpportunity(
     symbol: string,
-    timeFrame: ChartTimeframe,
+    timeFrame: ChartTimeFrame,
     candleData: PriceRecordDto[],
     closingPrices: number[],
     rsiResults: number[],
@@ -29,7 +29,8 @@ export class AnalyzeStrategyService {
       symbol,
       timeFrame,
       closingPrices,
-      rsiResults
+      rsiResults,
+      candleData[candleData.length - 1].event_number
     );
     if (rsiDivergenceOpportunity) {
       // this.pushToCandidateList(<AnalyzedCandidate>{
@@ -44,7 +45,8 @@ export class AnalyzeStrategyService {
       timeFrame,
       closingPrices,
       bbResults,
-      rsiResults
+      rsiResults,
+      candleData[candleData.length - 1].event_number
     );
     if (bbOpportunity) {
       this.pushToCandidateList(<AnalyzedCandidate>{
@@ -102,16 +104,17 @@ export class AnalyzeStrategyService {
 
   private findRsiDivergenceOpportunity(
     symbol: string,
-    timeFrame: ChartTimeframe,
+    timeFrame: ChartTimeFrame,
     closingPrices: number[],
-    rsiResults: number[]
+    rsiResults: number[],
+    eventNumber: number
   ): AnalyzeResult | null {
-    if (rsiResults.length > 55) {
+    if (rsiResults.length > 80) {
       //
 
       let rsiWithPriceList: RsiWithPrice[] = [];
 
-      for (let index = 1; index < 50; index++) {
+      for (let index = 1; index < 66; index++) {
         rsiWithPriceList.push({
           rsiValue: rsiResults[rsiResults.length - index],
           closePrice: closingPrices[closingPrices.length - index],
@@ -139,23 +142,36 @@ export class AnalyzeStrategyService {
         rsiResults[rsiResults.length - 4] < rsiResults[rsiResults.length - 5];
 
       let bottomsAreInOversoldRegion =
-        lowestBottom.rsiValue < 30 && secondLowestBottom.rsiValue < 35;
+        lowestBottom.rsiValue < 27 && secondLowestBottom.rsiValue < 37;
 
       let bottomsHasEnoughCandleGap =
-        secondLowestBottom.candleIndex - lowestBottom.candleIndex > 5;
+        secondLowestBottom.candleIndex - lowestBottom.candleIndex > 10;
 
       let rsiBottomsShowAscendingOrder =
-        secondLowestBottom.rsiValue > lowestBottom.rsiValue + 1;
+        secondLowestBottom.rsiValue > lowestBottom.rsiValue;
 
       let pricesShowDescendingOrder =
         secondLowestBottom.closePrice < lowestBottom.closePrice;
+
+      let onePercentBelowPriceFromRsiLowestBottom =
+        lowestBottom.closePrice - (lowestBottom.closePrice / 100) * 1;
+
+      let rsiBottomsHasConsiderableDiff =
+        secondLowestBottom.rsiValue > lowestBottom.rsiValue + 13;
+
+      let bottomPricesHasConsiderableDiff =
+        secondLowestBottom.closePrice < onePercentBelowPriceFromRsiLowestBottom;
+
+      let rsiBottomValuesOrPricesHasConsiderableDiff =
+        bottomPricesHasConsiderableDiff || rsiBottomsHasConsiderableDiff;
 
       let rsiBullishDivergenceFormed =
         bottomsAreInOversoldRegion &&
         bottomsHasEnoughCandleGap &&
         rsiBottomsShowAscendingOrder &&
         pricesShowDescendingOrder &&
-        lastClosedCandleFormedShallowBottom;
+        lastClosedCandleFormedShallowBottom &&
+        rsiBottomValuesOrPricesHasConsiderableDiff;
 
       // bearish logic
       let highestTop: RsiWithPrice = rsiWithPriceList[0];
@@ -177,23 +193,36 @@ export class AnalyzeStrategyService {
         rsiResults[rsiResults.length - 4] > rsiResults[rsiResults.length - 5];
 
       let topsAreInOverboughtRegion =
-        highestTop.rsiValue > 70 && secondHighestTop.rsiValue > 65;
+        highestTop.rsiValue > 73 && secondHighestTop.rsiValue > 63;
 
       let topsHasEnoughCandleGap =
-        secondHighestTop.candleIndex - highestTop.candleIndex > 5;
+        secondHighestTop.candleIndex - highestTop.candleIndex > 10;
 
       let rsiTopsShowDescendingOrder =
-        highestTop.rsiValue > secondHighestTop.rsiValue + 1;
+        highestTop.rsiValue > secondHighestTop.rsiValue;
 
       let pricesShowAscendingOrder =
         secondHighestTop.closePrice > highestTop.closePrice;
+
+      let onePercentAbovePriceFromRsiHighestTop =
+        highestTop.closePrice + (highestTop.closePrice / 100) * 1;
+
+      let rsiTopsHasConsiderableDiff =
+        secondHighestTop.rsiValue < highestTop.rsiValue - 13;
+
+      let topsPricesHasConsiderableDiff =
+        secondHighestTop.closePrice > onePercentAbovePriceFromRsiHighestTop;
+
+      let rsiTopsValuesOrPricesHasConsiderableDiff =
+        topsPricesHasConsiderableDiff || rsiTopsHasConsiderableDiff;
 
       let rsiBearishDivergenceFormed =
         topsAreInOverboughtRegion &&
         topsHasEnoughCandleGap &&
         rsiTopsShowDescendingOrder &&
         pricesShowAscendingOrder &&
-        lastClosedCandleFormedLowerHigh;
+        lastClosedCandleFormedLowerHigh &&
+        rsiTopsValuesOrPricesHasConsiderableDiff;
 
       if (rsiBullishDivergenceFormed) {
         return <AnalyzeResult>{
@@ -201,6 +230,7 @@ export class AnalyzeStrategyService {
           strategy: AnalyzeStrategy.RSI_DIVERGENCE,
           direction: TrendDirection.BULLISH,
           timeFrame: timeFrame,
+          eventNumber: eventNumber,
         };
       } else if (rsiBearishDivergenceFormed) {
         return <AnalyzeResult>{
@@ -208,6 +238,7 @@ export class AnalyzeStrategyService {
           strategy: AnalyzeStrategy.RSI_DIVERGENCE,
           direction: TrendDirection.BEARISH,
           timeFrame: timeFrame,
+          eventNumber: eventNumber,
         };
       } else {
         return null;
@@ -219,33 +250,26 @@ export class AnalyzeStrategyService {
 
   private findBollingerBandOpportunity(
     symbol: string,
-    timeFrame: ChartTimeframe,
+    timeFrame: ChartTimeFrame,
     closingPrices: number[],
     bbResults: BollingerBandsOutput[],
-    rsiResults: number[]
+    rsiResults: number[],
+    eventNumber: number
   ): AnalyzeResult | null {
     let timeFrameIsAbove1h =
-      timeFrame == ChartTimeframe.THIRTY_MINUTE ||
-      timeFrame == ChartTimeframe.ONE_HOUR ||
-      timeFrame == ChartTimeframe.TWO_HOUR ||
-      timeFrame == ChartTimeframe.FOUR_HOUR ||
-      timeFrame == ChartTimeframe.TWELVE_HOUR ||
-      timeFrame == ChartTimeframe.ONE_DAY;
+      timeFrame == ChartTimeFrame.THIRTY_MINUTE ||
+      timeFrame == ChartTimeFrame.ONE_HOUR ||
+      timeFrame == ChartTimeFrame.TWO_HOUR ||
+      timeFrame == ChartTimeFrame.FOUR_HOUR ||
+      timeFrame == ChartTimeFrame.TWELVE_HOUR ||
+      timeFrame == ChartTimeFrame.ONE_DAY;
 
     if (bbResults.length > 60 && timeFrameIsAbove1h) {
-      let bbLowerValues: number[] = [];
-      let bbUpperValues: number[] = [];
-
-      for (let index = 55; index > 0; index--) {
-        bbLowerValues.push(bbResults[bbResults.length - index].lower);
-        bbUpperValues.push(bbResults[bbResults.length - index].upper);
-      }
-
       let currentRsiValue = rsiResults[rsiResults.length - 2];
       let currentBbValue = bbResults[bbResults.length - 2];
       let currentTradingPrice = closingPrices[closingPrices.length - 2];
 
-      let bbCurrentlowerLimit =
+      let bbCurrentLowerLimit =
         currentBbValue.middle -
         ((currentBbValue.middle - currentBbValue.lower) / 100) * 90;
       let bbLoweBandLowerLimit =
@@ -253,7 +277,7 @@ export class AnalyzeStrategyService {
         ((currentBbValue.middle - currentBbValue.lower) / 100) * 120;
 
       let bbCurrentIsBelowLimit =
-        currentTradingPrice < bbCurrentlowerLimit &&
+        currentTradingPrice < bbCurrentLowerLimit &&
         currentTradingPrice > bbLoweBandLowerLimit &&
         currentTradingPrice < currentBbValue.lower &&
         currentRsiValue < 27;
@@ -280,6 +304,7 @@ export class AnalyzeStrategyService {
           strategy: AnalyzeStrategy.RSI_WITH_BB,
           direction: TrendDirection.BULLISH,
           timeFrame: timeFrame,
+          eventNumber: eventNumber,
         };
       } else if (bbCurrentIsAboveLimit) {
         return <AnalyzeResult>{
@@ -287,6 +312,7 @@ export class AnalyzeStrategyService {
           strategy: AnalyzeStrategy.RSI_WITH_BB,
           direction: TrendDirection.BEARISH,
           timeFrame: timeFrame,
+          eventNumber: eventNumber,
         };
       } else {
         return null;
