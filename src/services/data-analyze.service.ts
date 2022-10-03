@@ -7,12 +7,15 @@ import "dotenv/config";
 import { AnalyzeStrategyService } from "./analyze-strategy-service";
 import { AnalyzeResult } from "../models/analyze-result.model";
 import { MessageConstructService } from "./message-construct-service";
+import { LogWriterService } from "./log-writer.service";
+import { trimUSDT } from "./utils";
 
 export class DataAnalyzeService {
   private static _instance: DataAnalyzeService;
 
   private analyzeStrategyService = AnalyzeStrategyService.getInstance();
   private messageConstructService = MessageConstructService.getInstance();
+  private logWriter = LogWriterService.getInstance();
 
   private opportunityList: AnalyzeResult[] = [];
   private selectedSymbolList: string[] = [];
@@ -80,10 +83,12 @@ export class DataAnalyzeService {
   }
 
   public async finishSessionProcessing() {
+    this.logSessionSignals();
+
     let filteredOpportunityList =
       this.analyzeStrategyService.filterBestOpportunities(
         this.opportunityList,
-        7
+        5
       );
 
     this.messageConstructService.constructAndSendOpportunityList(
@@ -92,5 +97,15 @@ export class DataAnalyzeService {
 
     this.opportunityList = [];
     this.selectedSymbolList = [];
+  }
+
+  private logSessionSignals() {
+    if (this.opportunityList.length > 0) {
+      let logMessage = "opportunities: ";
+      this.opportunityList.forEach((item) => {
+        logMessage += `${trimUSDT(item.symbol)}-${item.timeFrame}, `;
+      });
+      this.logWriter.info(logMessage);
+    }
   }
 }

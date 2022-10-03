@@ -31,9 +31,9 @@ export class MessageConstructService {
         let strategyIcon = "🔮";
         let strategyLabel = "";
 
-        let signalIsInRecentHistory = this.signalNotInRecentList(signal);
+        let signalIsNotInRecentHistory = this.signalNotInRecentList(signal);
 
-        if (signalIsInRecentHistory) {
+        if (signalIsNotInRecentHistory) {
           if (signal.strategy === AnalyzeStrategy.RSI_DIVERGENCE) {
             strategyIcon = "💎";
             strategyLabel = " (RSI-DVG)";
@@ -68,7 +68,7 @@ export class MessageConstructService {
   }
 
   private signalNotInRecentList(signal: AnalyzeResult): boolean {
-    let lastSignalEventNumber = signal.eventNumber;
+    let lastSignalEventNumber: number | null = null;
 
     this.signalHistory.some((item) => {
       if (
@@ -81,10 +81,14 @@ export class MessageConstructService {
       }
     });
 
-    if (signal.eventNumber > lastSignalEventNumber + 20) {
-      return true;
+    if (lastSignalEventNumber) {
+      if (signal.eventNumber > lastSignalEventNumber + 20) {
+        return true;
+      } else {
+        return false;
+      }
     } else {
-      return false;
+      return true;
     }
   }
 }

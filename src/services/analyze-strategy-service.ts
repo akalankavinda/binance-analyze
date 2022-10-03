@@ -7,6 +7,7 @@ import { TrendDirection } from "../enums/trend-direction.enum";
 import { PriceRecordDto } from "../models/price-record.dto";
 import { time } from "console";
 import { AnalyzedCandidate } from "../models/analyzed-candidate.model";
+import { LogWriterService } from "./log-writer.service";
 
 export class AnalyzeStrategyService {
   // singleton
@@ -14,6 +15,8 @@ export class AnalyzeStrategyService {
   public static getInstance() {
     return this._instance || (this._instance = new this());
   }
+
+  private logWriter = LogWriterService.getInstance();
 
   private analyzedCandidates: AnalyzedCandidate[] = [];
 
@@ -109,10 +112,26 @@ export class AnalyzeStrategyService {
     rsiResults: number[],
     eventNumber: number
   ): AnalyzeResult | null {
-    if (rsiResults.length > 80) {
+    if (rsiResults.length > 70) {
       //
 
       let rsiWithPriceList: RsiWithPrice[] = [];
+
+      let percentageLimit = 1;
+
+      if (timeFrame === ChartTimeFrame.THIRTY_MINUTE) {
+        percentageLimit = 2;
+      } else if (timeFrame === ChartTimeFrame.ONE_HOUR) {
+        percentageLimit = 4;
+      } else if (timeFrame === ChartTimeFrame.TWO_HOUR) {
+        percentageLimit = 6;
+      } else if (timeFrame === ChartTimeFrame.FOUR_HOUR) {
+        percentageLimit = 10;
+      } else if (timeFrame === ChartTimeFrame.TWELVE_HOUR) {
+        percentageLimit = 15;
+      } else if (timeFrame === ChartTimeFrame.ONE_DAY) {
+        percentageLimit = 20;
+      }
 
       for (let index = 1; index < 66; index++) {
         rsiWithPriceList.push({
@@ -123,14 +142,14 @@ export class AnalyzeStrategyService {
       }
 
       // bullish logic
-      let lowestBottom: RsiWithPrice = rsiWithPriceList[0];
+      let rsiLowestBottom: RsiWithPrice = rsiWithPriceList[0];
       rsiWithPriceList.forEach((item) => {
-        if (item.rsiValue < lowestBottom.rsiValue) {
-          lowestBottom = item;
+        if (item.rsiValue < rsiLowestBottom.rsiValue) {
+          rsiLowestBottom = item;
         }
       });
 
-      let secondLowestBottom: RsiWithPrice = {
+      let rsiSecondLowestBottom: RsiWithPrice = {
         rsiValue: rsiResults[rsiResults.length - 3],
         closePrice: closingPrices[rsiResults.length - 3],
         candleIndex: rsiResults.length - 3,
@@ -142,25 +161,27 @@ export class AnalyzeStrategyService {
         rsiResults[rsiResults.length - 4] < rsiResults[rsiResults.length - 5];
 
       let bottomsAreInOversoldRegion =
-        lowestBottom.rsiValue < 27 && secondLowestBottom.rsiValue < 37;
+        rsiLowestBottom.rsiValue < 27 && rsiSecondLowestBottom.rsiValue < 37;
 
       let bottomsHasEnoughCandleGap =
-        secondLowestBottom.candleIndex - lowestBottom.candleIndex > 10;
+        rsiSecondLowestBottom.candleIndex - rsiLowestBottom.candleIndex > 10;
 
       let rsiBottomsShowAscendingOrder =
-        secondLowestBottom.rsiValue > lowestBottom.rsiValue;
+        rsiSecondLowestBottom.rsiValue > rsiLowestBottom.rsiValue;
 
       let pricesShowDescendingOrder =
-        secondLowestBottom.closePrice < lowestBottom.closePrice;
+        rsiSecondLowestBottom.closePrice < rsiLowestBottom.closePrice;
 
       let onePercentBelowPriceFromRsiLowestBottom =
-        lowestBottom.closePrice - (lowestBottom.closePrice / 100) * 1;
+        rsiLowestBottom.closePrice -
+        (rsiLowestBottom.closePrice / 100) * percentageLimit;
 
       let rsiBottomsHasConsiderableDiff =
-        secondLowestBottom.rsiValue > lowestBottom.rsiValue + 13;
+        rsiSecondLowestBottom.rsiValue > rsiLowestBottom.rsiValue + 10;
 
       let bottomPricesHasConsiderableDiff =
-        secondLowestBottom.closePrice < onePercentBelowPriceFromRsiLowestBottom;
+        rsiSecondLowestBottom.closePrice <
+        onePercentBelowPriceFromRsiLowestBottom;
 
       let rsiBottomValuesOrPricesHasConsiderableDiff =
         bottomPricesHasConsiderableDiff || rsiBottomsHasConsiderableDiff;
@@ -174,14 +195,14 @@ export class AnalyzeStrategyService {
         rsiBottomValuesOrPricesHasConsiderableDiff;
 
       // bearish logic
-      let highestTop: RsiWithPrice = rsiWithPriceList[0];
+      let rsiHighestTop: RsiWithPrice = rsiWithPriceList[0];
       rsiWithPriceList.forEach((item) => {
-        if (item.rsiValue > highestTop.rsiValue) {
-          highestTop = item;
+        if (item.rsiValue > rsiHighestTop.rsiValue) {
+          rsiHighestTop = item;
         }
       });
 
-      let secondHighestTop: RsiWithPrice = {
+      let rsiSecondHighestTop: RsiWithPrice = {
         rsiValue: rsiResults[rsiResults.length - 3],
         closePrice: closingPrices[rsiResults.length - 3],
         candleIndex: rsiResults.length - 3,
@@ -193,25 +214,26 @@ export class AnalyzeStrategyService {
         rsiResults[rsiResults.length - 4] > rsiResults[rsiResults.length - 5];
 
       let topsAreInOverboughtRegion =
-        highestTop.rsiValue > 73 && secondHighestTop.rsiValue > 63;
+        rsiHighestTop.rsiValue > 73 && rsiSecondHighestTop.rsiValue > 63;
 
       let topsHasEnoughCandleGap =
-        secondHighestTop.candleIndex - highestTop.candleIndex > 10;
+        rsiSecondHighestTop.candleIndex - rsiHighestTop.candleIndex > 10;
 
       let rsiTopsShowDescendingOrder =
-        highestTop.rsiValue > secondHighestTop.rsiValue;
+        rsiHighestTop.rsiValue > rsiSecondHighestTop.rsiValue;
 
       let pricesShowAscendingOrder =
-        secondHighestTop.closePrice > highestTop.closePrice;
+        rsiSecondHighestTop.closePrice > rsiHighestTop.closePrice;
 
       let onePercentAbovePriceFromRsiHighestTop =
-        highestTop.closePrice + (highestTop.closePrice / 100) * 1;
+        rsiHighestTop.closePrice +
+        (rsiHighestTop.closePrice / 100) * percentageLimit;
 
       let rsiTopsHasConsiderableDiff =
-        secondHighestTop.rsiValue < highestTop.rsiValue - 13;
+        rsiSecondHighestTop.rsiValue < rsiHighestTop.rsiValue - 10;
 
       let topsPricesHasConsiderableDiff =
-        secondHighestTop.closePrice > onePercentAbovePriceFromRsiHighestTop;
+        rsiSecondHighestTop.closePrice > onePercentAbovePriceFromRsiHighestTop;
 
       let rsiTopsValuesOrPricesHasConsiderableDiff =
         topsPricesHasConsiderableDiff || rsiTopsHasConsiderableDiff;
@@ -264,7 +286,7 @@ export class AnalyzeStrategyService {
       timeFrame == ChartTimeFrame.TWELVE_HOUR ||
       timeFrame == ChartTimeFrame.ONE_DAY;
 
-    if (bbResults.length > 60 && timeFrameIsAbove1h) {
+    if (bbResults.length > 5 && timeFrameIsAbove1h) {
       let currentRsiValue = rsiResults[rsiResults.length - 2];
       let currentBbValue = bbResults[bbResults.length - 2];
       let currentTradingPrice = closingPrices[closingPrices.length - 2];
@@ -460,9 +482,38 @@ export class AnalyzeStrategyService {
       let rsiValueB =
         b.direction === TrendDirection.BULLISH ? 100 - b.rsiValue : b.rsiValue;
 
+      let timeFrameWeightA = 1;
+      let timeFrameWeightB = 1;
+
+      if (a.timeFrame === ChartTimeFrame.ONE_HOUR) {
+        timeFrameWeightA = 1.1;
+      } else if (a.timeFrame === ChartTimeFrame.TWO_HOUR) {
+        timeFrameWeightA = 1.2;
+      } else if (a.timeFrame === ChartTimeFrame.FOUR_HOUR) {
+        timeFrameWeightA = 1.4;
+      } else if (
+        a.timeFrame === ChartTimeFrame.TWELVE_HOUR ||
+        a.timeFrame === ChartTimeFrame.ONE_DAY
+      ) {
+        timeFrameWeightA = 1.5;
+      }
+
+      if (b.timeFrame === ChartTimeFrame.ONE_HOUR) {
+        timeFrameWeightB = 1.1;
+      } else if (b.timeFrame === ChartTimeFrame.TWO_HOUR) {
+        timeFrameWeightB = 1.2;
+      } else if (b.timeFrame === ChartTimeFrame.FOUR_HOUR) {
+        timeFrameWeightB = 1.4;
+      } else if (
+        b.timeFrame === ChartTimeFrame.TWELVE_HOUR ||
+        b.timeFrame === ChartTimeFrame.ONE_DAY
+      ) {
+        timeFrameWeightB = 1.5;
+      }
+
       let sortCalculation: number =
-        rsiValueB * b.bollingerBandPercentage -
-        rsiValueA * a.bollingerBandPercentage;
+        rsiValueB * b.bollingerBandPercentage * timeFrameWeightB -
+        rsiValueA * a.bollingerBandPercentage * timeFrameWeightA;
 
       return sortCalculation;
     });
