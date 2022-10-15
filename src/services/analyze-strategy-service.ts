@@ -134,7 +134,7 @@ export class AnalyzeStrategyService {
       }
 
       for (let index = 1; index < 66; index++) {
-        rsiWithPriceList.push({
+        rsiWithPriceList.unshift({
           rsiValue: rsiResults[rsiResults.length - index],
           closePrice: closingPrices[closingPrices.length - index],
           candleIndex: rsiResults.length - index,
@@ -142,23 +142,38 @@ export class AnalyzeStrategyService {
       }
 
       // bullish logic
-      let rsiLowestBottom: RsiWithPrice = rsiWithPriceList[0];
-      rsiWithPriceList.forEach((item) => {
+      let rsiLowestBottomIndex = rsiWithPriceList.length - 1;
+      let rsiLowestBottom: RsiWithPrice =
+        rsiWithPriceList[rsiLowestBottomIndex];
+
+      rsiWithPriceList.forEach((item, index) => {
         if (item.rsiValue < rsiLowestBottom.rsiValue) {
           rsiLowestBottom = item;
+          rsiLowestBottomIndex = index;
         }
       });
 
-      let rsiSecondLowestBottom: RsiWithPrice = {
-        rsiValue: rsiResults[rsiResults.length - 3],
-        closePrice: closingPrices[rsiResults.length - 3],
-        candleIndex: rsiResults.length - 3,
-      };
+      let rsiSecondLowestBottom: RsiWithPrice =
+        rsiWithPriceList[rsiWithPriceList.length - 3];
 
-      let lastClosedCandleFormedShallowBottom =
+      let lastClosedCandleFormedSecondLowestBottom =
         rsiResults[rsiResults.length - 2] > rsiResults[rsiResults.length - 3] &&
         rsiResults[rsiResults.length - 3] < rsiResults[rsiResults.length - 4] &&
         rsiResults[rsiResults.length - 4] < rsiResults[rsiResults.length - 5];
+
+      let noCandlesBetweenRsiBottomsClosedBelowCurrentPrice = true;
+
+      for (
+        let index = rsiLowestBottomIndex + 1;
+        index < rsiWithPriceList.length - 3;
+        index++
+      ) {
+        if (
+          rsiWithPriceList[index].closePrice < rsiSecondLowestBottom.closePrice
+        ) {
+          noCandlesBetweenRsiBottomsClosedBelowCurrentPrice = false;
+        }
+      }
 
       let bottomsAreInOversoldRegion =
         rsiLowestBottom.rsiValue < 27 && rsiSecondLowestBottom.rsiValue < 37;
@@ -191,27 +206,42 @@ export class AnalyzeStrategyService {
         bottomsHasEnoughCandleGap &&
         rsiBottomsShowAscendingOrder &&
         pricesShowDescendingOrder &&
-        lastClosedCandleFormedShallowBottom &&
+        lastClosedCandleFormedSecondLowestBottom &&
+        noCandlesBetweenRsiBottomsClosedBelowCurrentPrice &&
         rsiBottomValuesOrPricesHasConsiderableDiff;
 
       // bearish logic
-      let rsiHighestTop: RsiWithPrice = rsiWithPriceList[0];
-      rsiWithPriceList.forEach((item) => {
+      let rsiHighestTopIndex = rsiWithPriceList.length - 1;
+      let rsiHighestTop: RsiWithPrice = rsiWithPriceList[rsiHighestTopIndex];
+
+      rsiWithPriceList.forEach((item, index) => {
         if (item.rsiValue > rsiHighestTop.rsiValue) {
           rsiHighestTop = item;
+          rsiHighestTopIndex = index;
         }
       });
 
-      let rsiSecondHighestTop: RsiWithPrice = {
-        rsiValue: rsiResults[rsiResults.length - 3],
-        closePrice: closingPrices[rsiResults.length - 3],
-        candleIndex: rsiResults.length - 3,
-      };
+      let rsiSecondHighestTop: RsiWithPrice =
+        rsiWithPriceList[rsiWithPriceList.length - 3];
 
       let lastClosedCandleFormedLowerHigh =
         rsiResults[rsiResults.length - 2] < rsiResults[rsiResults.length - 3] &&
         rsiResults[rsiResults.length - 3] > rsiResults[rsiResults.length - 4] &&
         rsiResults[rsiResults.length - 4] > rsiResults[rsiResults.length - 5];
+
+      let noCandlesBetweenRsiTopsClosedAboveCurrentPrice = true;
+
+      for (
+        let index = rsiHighestTopIndex + 1;
+        index < rsiWithPriceList.length - 3;
+        index++
+      ) {
+        if (
+          rsiWithPriceList[index].closePrice > rsiSecondHighestTop.closePrice
+        ) {
+          noCandlesBetweenRsiTopsClosedAboveCurrentPrice = false;
+        }
+      }
 
       let topsAreInOverboughtRegion =
         rsiHighestTop.rsiValue > 73 && rsiSecondHighestTop.rsiValue > 63;
@@ -244,6 +274,7 @@ export class AnalyzeStrategyService {
         rsiTopsShowDescendingOrder &&
         pricesShowAscendingOrder &&
         lastClosedCandleFormedLowerHigh &&
+        noCandlesBetweenRsiTopsClosedAboveCurrentPrice &&
         rsiTopsValuesOrPricesHasConsiderableDiff;
 
       if (rsiBullishDivergenceFormed) {

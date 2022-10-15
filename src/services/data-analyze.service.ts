@@ -88,7 +88,7 @@ export class DataAnalyzeService {
     let filteredOpportunityList =
       this.analyzeStrategyService.filterBestOpportunities(
         this.opportunityList,
-        5
+        3
       );
 
     this.messageConstructService.constructAndSendOpportunityList(
