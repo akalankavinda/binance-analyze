@@ -1,4 +1,3 @@
-import { Subject } from "rxjs";
 import { RSI, BollingerBands } from "technicalindicators";
 import { ChartTimeFrame } from "../enums/chart-timeframes.enum";
 import { ChartData } from "../models/chart-data";
@@ -7,15 +6,14 @@ import "dotenv/config";
 import { AnalyzeStrategyService } from "./analyze-strategy-service";
 import { AnalyzeResult } from "../models/analyze-result.model";
 import { MessageConstructService } from "./message-construct-service";
-import { LogWriterService } from "./log-writer.service";
-import { trimUSDT } from "./utils";
+import { filterBestOpportunities } from "./analyze-strategies/filter-best-opportunities";
+import { findBollingerBandPercentage } from "./analyze-strategies/bollinger-bands";
 
 export class DataAnalyzeService {
   private static _instance: DataAnalyzeService;
 
   private analyzeStrategyService = AnalyzeStrategyService.getInstance();
   private messageConstructService = MessageConstructService.getInstance();
-  private logWriter = LogWriterService.getInstance();
 
   private opportunityList: AnalyzeResult[] = [];
   private selectedSymbolList: string[] = [];
@@ -54,7 +52,6 @@ export class DataAnalyzeService {
         symbol,
         chartTimeFrame,
         chartData[key],
-        closingPrices,
         rsiResults,
         bollingerBandResults
       );
@@ -65,12 +62,11 @@ export class DataAnalyzeService {
           let lastBbValue =
             bollingerBandResults[bollingerBandResults.length - 1];
           let lastRsiValue = rsiResults[rsiResults.length - 1];
-          let bbPercentage =
-            this.analyzeStrategyService.findBollingerBandPercentage(
-              tmpAnalyzedResult.direction,
-              lastPrice,
-              lastBbValue
-            );
+          let bbPercentage = findBollingerBandPercentage(
+            tmpAnalyzedResult.direction,
+            lastPrice,
+            lastBbValue
+          );
 
           tmpAnalyzedResult.bollingerBandPercentage = bbPercentage;
           tmpAnalyzedResult.rsiValue = lastRsiValue;
@@ -83,13 +79,12 @@ export class DataAnalyzeService {
   }
 
   public async finishSessionProcessing() {
-    this.logSessionSignals();
+    this.analyzeStrategyService.logSessionSignals();
 
-    let filteredOpportunityList =
-      this.analyzeStrategyService.filterBestOpportunities(
-        this.opportunityList,
-        3
-      );
+    let filteredOpportunityList = filterBestOpportunities(
+      this.opportunityList,
+      3
+    );
 
     this.messageConstructService.constructAndSendOpportunityList(
       filteredOpportunityList
@@ -97,15 +92,5 @@ export class DataAnalyzeService {
 
     this.opportunityList = [];
     this.selectedSymbolList = [];
-  }
-
-  private logSessionSignals() {
-    if (this.opportunityList.length > 0) {
-      let logMessage = "opportunities: ";
-      this.opportunityList.forEach((item) => {
-        logMessage += `${trimUSDT(item.symbol)}-${item.timeFrame}, `;
-      });
-      this.logWriter.info(logMessage);
-    }
   }
 }

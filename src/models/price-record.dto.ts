@@ -5,5 +5,6 @@ export interface PriceRecordDto {
   high: number;
   low: number;
   event_number: number;
+  timeFrameEventNumber: number;
   timestamp: number;
 }

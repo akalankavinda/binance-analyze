@@ -1,4 +1,5 @@
 import { AnalyzeStrategy } from "../enums/analyze-strategies.enum";
+import { ChartTimeFrame } from "../enums/chart-timeframes.enum";
 import { TelegramChannels } from "../enums/telegram-channels.enum";
 import { TrendDirection } from "../enums/trend-direction.enum";
 import { AnalyzeResult } from "../models/analyze-result.model";
@@ -28,27 +29,50 @@ export class MessageConstructService {
         }`;
         let trendIcon =
           signal.direction === TrendDirection.BULLISH ? "🟢" : "🔴";
-        let strategyIcon = "🔮";
+        let strategyIcon = "";
         let strategyLabel = "";
 
         let signalIsNotInRecentHistory = this.signalNotInRecentList(signal);
 
+        let emojiEnabled = false;
+        if (
+          signal.timeFrame === ChartTimeFrame.ONE_HOUR ||
+          signal.timeFrame === ChartTimeFrame.TWO_HOUR ||
+          signal.timeFrame === ChartTimeFrame.FOUR_HOUR ||
+          signal.timeFrame === ChartTimeFrame.TWELVE_HOUR ||
+          signal.timeFrame === ChartTimeFrame.ONE_DAY
+        ) {
+          emojiEnabled = true;
+        }
+
         if (signalIsNotInRecentHistory) {
           if (signal.strategy === AnalyzeStrategy.RSI_DIVERGENCE) {
-            strategyIcon = "💎";
+            if (emojiEnabled) {
+              strategyIcon = "💎";
+            }
+
             strategyLabel = " (RSI-DVG)";
           }
 
+          if (signal.strategy === AnalyzeStrategy.RSI_TRIPLE_DIVERGENCE) {
+            if (emojiEnabled) {
+              strategyIcon = "🔮";
+            }
+            strategyLabel = " (RSI-3-DVG)";
+          }
+
           if (signal.strategy === AnalyzeStrategy.RSI_WITH_BB) {
-            strategyIcon = "🔥";
+            if (emojiEnabled) {
+              strategyIcon = "🔥";
+            }
             strategyLabel = " (RSI+BB)";
           }
 
           tmpMessage = `${trendIcon} - ${symbolAndTimeFrameText} - ${strategyIcon}${strategyLabel}\n`;
           message += tmpMessage;
-        }
 
-        this.pushToRecentSignals(signal);
+          this.pushToRecentSignals(signal);
+        }
       });
 
       if (message.length > 0) {
@@ -74,7 +98,9 @@ export class MessageConstructService {
       if (
         item.symbol === signal.symbol &&
         item.strategy === signal.strategy &&
-        item.timeFrame === signal.timeFrame
+        item.timeFrame === signal.timeFrame &&
+        // skip this checkup for RSI-Divergence
+        item.strategy !== AnalyzeStrategy.RSI_DIVERGENCE
       ) {
         lastSignalEventNumber = item.eventNumber;
         return true;

@@ -97,24 +97,24 @@ export class DataStorageService {
     let chartString = "";
 
     // once in the middle of every 1Day candle
-    if (eventNumber15Minute % 96 === 0) {
-      chartString = `, ${ChartTimeFrame.ONE_DAY}${chartString}`;
-      await this.fetchTimeFrameChartData(
-        eventNumber1Day,
-        DataStorageTable.table1Day,
-        ChartTimeFrame.ONE_DAY
-      );
-    }
+    // if (eventNumber15Minute % 96 === 0) {
+    //   chartString = `, ${ChartTimeFrame.ONE_DAY}${chartString}`;
+    //   await this.fetchTimeFrameChartData(
+    //     eventNumber1Day,
+    //     DataStorageTable.table1Day,
+    //     ChartTimeFrame.ONE_DAY
+    //   );
+    // }
 
     // once in the middle of every 12Hour candle
-    if (eventNumber15Minute % 48 === 0) {
-      chartString = `, ${ChartTimeFrame.TWELVE_HOUR}${chartString}`;
-      await this.fetchTimeFrameChartData(
-        eventNumber12Hour,
-        DataStorageTable.table12Hour,
-        ChartTimeFrame.TWELVE_HOUR
-      );
-    }
+    // if (eventNumber15Minute % 48 === 0) {
+    //   chartString = `, ${ChartTimeFrame.TWELVE_HOUR}${chartString}`;
+    //   await this.fetchTimeFrameChartData(
+    //     eventNumber12Hour,
+    //     DataStorageTable.table12Hour,
+    //     ChartTimeFrame.TWELVE_HOUR
+    //   );
+    // }
 
     // once in the middle of every 4Hour candle
     if (eventNumber15Minute % 16 === 0) {
@@ -147,14 +147,14 @@ export class DataStorageService {
     }
 
     // once in the middle of every 30Minute candle
-    if (eventNumber15Minute % 2 === 0) {
-      chartString = ` ${ChartTimeFrame.THIRTY_MINUTE}${chartString}`;
-      await this.fetchTimeFrameChartData(
-        eventNumber30Minute,
-        DataStorageTable.table30Minute,
-        ChartTimeFrame.THIRTY_MINUTE
-      );
-    }
+    // if (eventNumber15Minute % 2 === 0) {
+    //   chartString = ` ${ChartTimeFrame.THIRTY_MINUTE}${chartString}`;
+    //   await this.fetchTimeFrameChartData(
+    //     eventNumber30Minute,
+    //     DataStorageTable.table30Minute,
+    //     ChartTimeFrame.THIRTY_MINUTE
+    //   );
+    // }
 
     chartString = ` ${ChartTimeFrame.FIFTEEN_MINUTE}${chartString}`;
     await this.fetchTimeFrameChartData(

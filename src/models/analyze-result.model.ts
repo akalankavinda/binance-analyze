@@ -11,4 +11,5 @@ export interface AnalyzeResult {
   rsiValue: number;
   bollingerBandPercentage: number;
   continuousCandleCount: number;
+  targetPrice: number;
 }
