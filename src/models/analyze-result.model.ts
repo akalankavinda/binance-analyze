@@ -7,7 +7,9 @@ export interface AnalyzeResult {
   strategy: AnalyzeStrategy;
   direction: TrendDirection;
   timeFrame: ChartTimeFrame;
+  lowerTimeFrame: ChartTimeFrame;
   eventNumber: number;
+  lowerTimeFrameEventNumber: number;
   rsiValue: number;
   bollingerBandPercentage: number;
   continuousCandleCount: number;

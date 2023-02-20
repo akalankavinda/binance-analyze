@@ -156,12 +156,13 @@ export class DataStorageService {
     //   );
     // }
 
-    chartString = ` ${ChartTimeFrame.FIFTEEN_MINUTE}${chartString}`;
-    await this.fetchTimeFrameChartData(
-      eventNumber15Minute,
-      DataStorageTable.table15Minute,
-      ChartTimeFrame.FIFTEEN_MINUTE
-    );
+    // once every 15Minute candle
+    // chartString = ` ${ChartTimeFrame.FIFTEEN_MINUTE}${chartString}`;
+    // await this.fetchTimeFrameChartData(
+    //   eventNumber15Minute,
+    //   DataStorageTable.table15Minute,
+    //   ChartTimeFrame.FIFTEEN_MINUTE
+    // );
 
     await this.dataAnalyzeService.finishSessionProcessing();
 
@@ -193,11 +194,26 @@ export class DataStorageService {
     eventNumber: number
   ): Promise<ChartData | null> {
     let historyLimitEventNumber = eventNumber - this.recordHistoryLimit;
-    let fetchQuery = `SELECT * FROM ${tableName} WHERE event_number >= ${historyLimitEventNumber} ORDER BY id ASC;`;
+    let fetchQuery = `SELECT * FROM ${tableName} WHERE event_number >= ? ORDER BY id ASC;`;
+    let fetchVariables = [historyLimitEventNumber];
     try {
-      const [rows, fields] = await this.conn.execute(fetchQuery);
+      const [rows, fields] = await this.conn.execute(
+        fetchQuery,
+        fetchVariables
+      );
       let typeCastedResults = <PriceRecordDto[]>rows;
       let tmpChartData: ChartData = {};
+
+      let timeFrameIsAllowed =
+        tableName === DataStorageTable.table1Hour ||
+        tableName === DataStorageTable.table2Hour ||
+        tableName === DataStorageTable.table4Hour;
+
+      if (timeFrameIsAllowed) {
+        this.logWriter.info(
+          `fetched ${typeCastedResults.length} rows from ${tableName}`
+        );
+      }
 
       typeCastedResults.forEach((priceRecord: PriceRecordDto) => {
         if (TradingSymbols.includes(priceRecord.symbol)) {
@@ -211,6 +227,7 @@ export class DataStorageService {
 
       return tmpChartData;
     } catch (error) {
+      console.log(error);
       return null;
     }
   }

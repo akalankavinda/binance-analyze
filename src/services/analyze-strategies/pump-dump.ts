@@ -19,29 +19,17 @@ export function findOpportunity(
     // let bbCurrentLowerLimit =
     //   currentBbValue.middle -
     //   ((currentBbValue.middle - currentBbValue.lower) / 100) * 90;
-    // let bbLoweBandLowerLimit =
-    //   lastClosedBbValue.middle -
-    //   ((lastClosedBbValue.middle - lastClosedBbValue.lower) / 100) * 150;
+
+    let bbLowerBandLowerLimit =
+      lastClosedBbValue.middle -
+      ((lastClosedBbValue.middle - lastClosedBbValue.lower) / 100) * 150;
 
     let eventNumber = candleData[candleData.length - 2].event_number;
     let lastClosedCandle = candleData[candleData.length - 2];
 
-    let recentCandlesBrokeBbLower = false;
-
-    for (let index = 3; index < 15; index++) {
-      if (
-        candleData[candleData.length - index].low <
-        bbResults[bbResults.length - index].lower
-      ) {
-        recentCandlesBrokeBbLower = true;
-      }
-    }
-
     let bbCurrentIsBelowLimit =
-      lastClosedCandle.low <= lastClosedBbValue.lower &&
-      lastClosedCandle.close > lastClosedBbValue.lower &&
-      lastClosedRsiValue < 35 &&
-      recentCandlesBrokeBbLower === false;
+      lastClosedCandle.low <= bbLowerBandLowerLimit &&
+      lastClosedCandle.close < lastClosedBbValue.lower;
 
     // bearish logic
 
@@ -49,28 +37,15 @@ export function findOpportunity(
     //   currentBbValue.middle +
     //   ((currentBbValue.upper - currentBbValue.middle) / 100) * 90;
 
-    // let bbUpperBandUpperLimit =
-    //   lastClosedBbValue.middle +
-    //   ((lastClosedBbValue.upper - lastClosedBbValue.middle) / 100) * 150;
+    let bbUpperBandUpperLimit =
+      lastClosedBbValue.middle +
+      ((lastClosedBbValue.upper - lastClosedBbValue.middle) / 100) * 150;
 
     let lastClosedCandle2 = candleData[candleData.length - 2];
 
-    let recentCandlesBrokeBbUpper = false;
-
-    for (let index = 3; index < 15; index++) {
-      if (
-        candleData[candleData.length - index].high >
-        bbResults[bbResults.length - index].upper
-      ) {
-        recentCandlesBrokeBbUpper = true;
-      }
-    }
-
     let bbCurrentIsAboveLimit =
-      lastClosedCandle2.high >= lastClosedBbValue.upper &&
-      lastClosedCandle2.close < lastClosedBbValue.upper &&
-      lastClosedRsiValue > 65 &&
-      recentCandlesBrokeBbUpper === false;
+      lastClosedCandle2.high >= bbUpperBandUpperLimit &&
+      lastClosedCandle2.close > lastClosedBbValue.upper;
 
     let lowerTimeFrame = ChartTimeFrame.FIFTEEN_MINUTE;
     let lowerTimeFrameEventNumber = eventNumber;
@@ -87,8 +62,8 @@ export function findOpportunity(
     if (bbCurrentIsBelowLimit) {
       return <AnalyzeResult>{
         symbol: symbol,
-        strategy: AnalyzeStrategy.RSI_WITH_BB,
-        direction: TrendDirection.BULLISH,
+        strategy: AnalyzeStrategy.PUMP_OR_DUMP,
+        direction: TrendDirection.BEARISH,
         timeFrame: timeFrame,
         lowerTimeFrame: lowerTimeFrame,
         eventNumber: eventNumber,
@@ -99,8 +74,8 @@ export function findOpportunity(
     } else if (bbCurrentIsAboveLimit) {
       return <AnalyzeResult>{
         symbol: symbol,
-        strategy: AnalyzeStrategy.RSI_WITH_BB,
-        direction: TrendDirection.BEARISH,
+        strategy: AnalyzeStrategy.PUMP_OR_DUMP,
+        direction: TrendDirection.BULLISH,
         timeFrame: timeFrame,
         lowerTimeFrame: lowerTimeFrame,
         eventNumber: eventNumber,
@@ -113,23 +88,5 @@ export function findOpportunity(
     }
   } else {
     return null;
-  }
-}
-
-export function findBollingerBandPercentage(
-  direction: TrendDirection,
-  tradingPrice: number,
-  bbValue: BollingerBandsOutput
-): number {
-  if (direction === TrendDirection.BULLISH) {
-    return (
-      ((bbValue.middle - tradingPrice) / (bbValue.middle - bbValue.lower)) * 100
-    );
-  } else if (direction === TrendDirection.BEARISH) {
-    return (
-      ((tradingPrice - bbValue.middle) / (bbValue.upper - bbValue.middle)) * 100
-    );
-  } else {
-    return 0;
   }
 }

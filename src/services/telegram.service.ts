@@ -10,12 +10,10 @@ export class TelegramService {
 
   private telegramEndpoint!: string;
   private telegramApiToken = <String>process.env.TELEGRAM_API_TOKEN;
-  private telegramChatId = process.env.TELEGRAM_PAPER_TRADE_CHAT_ID;
-  private telegramLogChatId = process.env.TELEGRAM_LOG_CHAT_ID;
 
   private telegramChannels = {
-    paperTradeChannel: process.env.TELEGRAM_PAPER_TRADE_CHAT_ID,
-    logChannel: process.env.TELEGRAM_LOG_CHAT_ID,
+    alerts_channel: process.env.TELEGRAM_ALERTS_CHANNEL_ID,
+    alerts_2_channel: process.env.TELEGRAM_ALERTS_2_CHANNEL_ID,
   };
 
   public static getInstance() {
@@ -27,8 +25,12 @@ export class TelegramService {
 
     this.pushMessage(
       `🔰 Analyze bot restarted`,
-      TelegramChannels.paperTradeChannel
+      TelegramChannels.ALERTS_CHANNEL
     );
+
+    this.logWriter.info("//////////////////////////////////");
+    this.logWriter.info("//////  ANALYZE BOT RESTARTED ");
+    this.logWriter.info("//////////////////////////////////");
   }
 
   public async pushMessage(message: string, channel: TelegramChannels) {

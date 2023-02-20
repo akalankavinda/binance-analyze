@@ -1,17 +1,19 @@
 import { AnalyzeResult } from "../../models/analyze-result.model";
 import { TrendDirection } from "../../enums/trend-direction.enum";
 import { ChartTimeFrame } from "../../enums/chart-timeframes.enum";
+
 export function filterBestOpportunities(
   opportunityList: AnalyzeResult[],
   limit: number = 1
 ) {
-  // remove bearish trending items
-  // let filteredBullishList = opportunityList.filter(
-  //   (item) => item.direction === TrendDirection.BULLISH
-  // );
-  // let filteredBearishList = opportunityList.filter(
-  //   (item) => item.direction === TrendDirection.BEARISH
-  // );
+  let dominantCoinOpportunities: AnalyzeResult[] = [];
+
+  opportunityList.forEach((item, index) => {
+    if (item.symbol === "BTCUSDT") {
+      dominantCoinOpportunities.push(item);
+    }
+    opportunityList.splice(index, 1);
+  });
 
   opportunityList.sort(function (a, b) {
     // descending sort
@@ -78,5 +80,7 @@ export function filterBestOpportunities(
   //   .splice(0, limit)
   //   .concat(filteredBearishList.splice(0, limit));
 
-  return opportunityList.splice(0, limit);
+  let splicedOpportunities = opportunityList.splice(0, limit);
+
+  return dominantCoinOpportunities.concat(splicedOpportunities);
 }

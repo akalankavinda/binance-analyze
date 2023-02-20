@@ -1,4 +1,4 @@
 export enum TelegramChannels {
-  paperTradeChannel = "paperTradeChannel",
-  logChannel = "logChannel",
+  ALERTS_CHANNEL = "alerts_channel",
+  ALERTS_2_CHANNEL = "alerts_2_channel",
 }

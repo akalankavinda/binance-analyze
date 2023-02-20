@@ -205,13 +205,26 @@ export function findOpportunity(
       noCandlesBrokeTopsTouchingLine &&
       rsiTopsValuesOrPricesHasConsiderableDiff;
 
+    let lowerTimeFrame = ChartTimeFrame.FIFTEEN_MINUTE;
+    let lowerTimeFrameEventNumber = rsiSecondLowestBottom.eventNumber;
+    if (timeFrame === ChartTimeFrame.ONE_HOUR) {
+      lowerTimeFrameEventNumber = rsiSecondLowestBottom.eventNumber * 4;
+    } else if (timeFrame === ChartTimeFrame.TWO_HOUR) {
+      lowerTimeFrameEventNumber = rsiSecondLowestBottom.eventNumber * 8;
+    } else if (timeFrame === ChartTimeFrame.FOUR_HOUR) {
+      lowerTimeFrame = ChartTimeFrame.ONE_HOUR;
+      lowerTimeFrameEventNumber = rsiSecondLowestBottom.eventNumber * 4;
+    }
+
     if (rsiBullishDivergenceFormed) {
       return <AnalyzeResult>{
         symbol: symbol,
         strategy: AnalyzeStrategy.RSI_DIVERGENCE,
         direction: TrendDirection.BULLISH,
         timeFrame: timeFrame,
+        lowerTimeFrame: lowerTimeFrame,
         eventNumber: rsiSecondLowestBottom.eventNumber,
+        lowerTimeFrameEventNumber: lowerTimeFrameEventNumber,
         rsiValue: rsiSecondLowestBottom.rsiValue,
         targetPrice: rsiSecondLowestBottom.closePrice,
       };
@@ -221,7 +234,9 @@ export function findOpportunity(
         strategy: AnalyzeStrategy.RSI_DIVERGENCE,
         direction: TrendDirection.BEARISH,
         timeFrame: timeFrame,
+        lowerTimeFrame: lowerTimeFrame,
         eventNumber: rsiSecondHighestTop.eventNumber,
+        lowerTimeFrameEventNumber: lowerTimeFrameEventNumber,
         rsiValue: rsiSecondHighestTop.rsiValue,
         targetPrice: rsiSecondHighestTop.closePrice,
       };
@@ -272,6 +287,19 @@ export function rsiTripleDivergenceFormed(
     let pricesShowDescendingOrder =
       rsiSecondLowestBottom.closePrice < rsiLowestBottom.closePrice;
 
+    // 6th condition
+    let noCandlesClosedBelowRsiSecondLowestBottom = true;
+
+    for (
+      let index = candleData.length - 4;
+      candleData[index].event_number > rsiLowestBottom.eventNumber;
+      index--
+    ) {
+      if (candleData[index].close < rsiSecondLowestBottom.closePrice) {
+        noCandlesClosedBelowRsiSecondLowestBottom = false;
+      }
+    }
+
     // 7th condition
     let onePercentBelowPriceFromRsiLowestBottom =
       rsiLowestBottom.closePrice -
@@ -292,6 +320,7 @@ export function rsiTripleDivergenceFormed(
       rsiBottomsShowAscendingOrder &&
       pricesShowDescendingOrder &&
       lastClosedCandleFormedSecondLowestBottom &&
+      noCandlesClosedBelowRsiSecondLowestBottom &&
       rsiBottomValuesOrPricesHasConsiderableDiff;
 
     if (rsiBullishDivergenceFormed) {
@@ -331,6 +360,19 @@ export function rsiTripleDivergenceFormed(
     let pricesShowAscendingOrder =
       rsiSecondHighestTop.closePrice > rsiHighestTop.closePrice;
 
+    // 6th condition
+    let noCandlesClosedAboveRsiSecondHighestTop = true;
+
+    for (
+      let index = candleData.length - 4;
+      candleData[index].event_number > rsiHighestTop.eventNumber;
+      index--
+    ) {
+      if (candleData[index].close > rsiSecondHighestTop.closePrice) {
+        noCandlesClosedAboveRsiSecondHighestTop = false;
+      }
+    }
+
     // 7th condition
     let onePercentAbovePriceFromRsiHighestTop =
       rsiHighestTop.closePrice +
@@ -350,6 +392,7 @@ export function rsiTripleDivergenceFormed(
       rsiTopsShowDescendingOrder &&
       pricesShowAscendingOrder &&
       lastClosedCandleFormedLowerHigh &&
+      noCandlesClosedAboveRsiSecondHighestTop &&
       rsiTopsValuesOrPricesHasConsiderableDiff;
 
     if (rsiBearishDivergenceFormed) {

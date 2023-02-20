@@ -12,8 +12,8 @@ export function formedSwingHighOrLow(
 
     if (candidate.direction === TrendDirection.BULLISH) {
       if (
-        lastClosedCandle.high > lastClosedPrevCandle.high //&&
-        // lastClosedCandle.close > lastClosedCandle.open
+        lastClosedCandle.high > lastClosedPrevCandle.high &&
+        lastClosedCandle.close > lastClosedCandle.open
       ) {
         return true;
       } else {
@@ -21,8 +21,8 @@ export function formedSwingHighOrLow(
       }
     } else if (candidate.direction === TrendDirection.BEARISH) {
       if (
-        lastClosedCandle.low < lastClosedPrevCandle.low //&&
-        //lastClosedCandle.close < lastClosedCandle.open
+        lastClosedCandle.low < lastClosedPrevCandle.low &&
+        lastClosedCandle.close < lastClosedCandle.open
       ) {
         return true;
       } else {

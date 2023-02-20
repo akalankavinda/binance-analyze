@@ -19,7 +19,7 @@ export class LogWriterService {
       logDirectory: "./logs", // NOTE: folder must exist and be writable...
       fileNamePattern: "<DATE>.log",
       dateFormat: "YYYY.MM.DD",
-      timestampFormat: "YYYY-MM-DD HH:mm:ss.SSS",
+      timestampFormat: "YYYY-MM-DD HH:mm:ss",
     };
     this.logger = createRollingFileLogger(opts);
   }

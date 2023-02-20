@@ -17,7 +17,10 @@ export class MessageConstructService {
   private signalHistory: AnalyzeResult[] = [];
   private signalHistoryLimit: number = 100;
 
-  public async constructAndSendOpportunityList(results: AnalyzeResult[]) {
+  public async constructAndSendOpportunityList(
+    results: AnalyzeResult[],
+    targetChannel: TelegramChannels = TelegramChannels.ALERTS_CHANNEL
+  ) {
     if (results.length > 0) {
       let message = "";
 
@@ -50,15 +53,18 @@ export class MessageConstructService {
             if (emojiEnabled) {
               strategyIcon = "💎";
             }
-
             strategyLabel = " (RSI-DVG)";
           }
 
-          if (signal.strategy === AnalyzeStrategy.RSI_TRIPLE_DIVERGENCE) {
+          if (signal.strategy === AnalyzeStrategy.PUMP_OR_DUMP) {
             if (emojiEnabled) {
               strategyIcon = "🔮";
             }
-            strategyLabel = " (RSI-3-DVG)";
+            strategyLabel =
+              signal.direction === TrendDirection.BULLISH
+                ? " (PUMP)"
+                : " (DUMP)";
+            strategyLabel = " (PUMP)";
           }
 
           if (signal.strategy === AnalyzeStrategy.RSI_WITH_BB) {
@@ -76,10 +82,7 @@ export class MessageConstructService {
       });
 
       if (message.length > 0) {
-        this.telegramService.pushMessage(
-          message,
-          TelegramChannels.paperTradeChannel
-        );
+        this.telegramService.pushMessage(message, targetChannel);
       }
     }
   }

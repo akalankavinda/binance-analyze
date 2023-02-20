@@ -16,6 +16,7 @@ export class DataAnalyzeService {
   private messageConstructService = MessageConstructService.getInstance();
 
   private opportunityList: AnalyzeResult[] = [];
+
   private selectedSymbolList: string[] = [];
 
   public static getInstance() {
@@ -38,7 +39,7 @@ export class DataAnalyzeService {
       let bollingerBandResults = BollingerBands.calculate({
         values: closingPrices,
         period: 55,
-        stdDev: 2,
+        stdDev: 3,
       });
 
       let rsiResults = RSI.calculate({
@@ -56,7 +57,12 @@ export class DataAnalyzeService {
         bollingerBandResults
       );
 
-      if (tmpAnalyzedResult != null) {
+      let timeFrameIsAllowed =
+        tmpAnalyzedResult?.timeFrame === ChartTimeFrame.ONE_HOUR ||
+        tmpAnalyzedResult?.timeFrame === ChartTimeFrame.TWO_HOUR ||
+        tmpAnalyzedResult?.timeFrame === ChartTimeFrame.FOUR_HOUR;
+
+      if (tmpAnalyzedResult != null && timeFrameIsAllowed) {
         if (!this.selectedSymbolList.includes(key)) {
           let lastPrice = closingPrices[closingPrices.length - 1];
           let lastBbValue =
