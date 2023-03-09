@@ -72,27 +72,13 @@ export function findOpportunity(
       lastClosedRsiValue > 65 &&
       recentCandlesBrokeBbUpper === false;
 
-    let lowerTimeFrame = ChartTimeFrame.FIFTEEN_MINUTE;
-    let lowerTimeFrameEventNumber = eventNumber;
-
-    if (timeFrame === ChartTimeFrame.ONE_HOUR) {
-      lowerTimeFrameEventNumber = eventNumber * 4;
-    } else if (timeFrame === ChartTimeFrame.TWO_HOUR) {
-      lowerTimeFrameEventNumber = eventNumber * 8;
-    } else if (timeFrame === ChartTimeFrame.FOUR_HOUR) {
-      lowerTimeFrame = ChartTimeFrame.ONE_HOUR;
-      lowerTimeFrameEventNumber = eventNumber * 4;
-    }
-
     if (bbCurrentIsBelowLimit) {
       return <AnalyzeResult>{
         symbol: symbol,
         strategy: AnalyzeStrategy.RSI_WITH_BB,
         direction: TrendDirection.BULLISH,
         timeFrame: timeFrame,
-        lowerTimeFrame: lowerTimeFrame,
         eventNumber: eventNumber,
-        lowerTimeFrameEventNumber: lowerTimeFrameEventNumber,
         rsiValue: lastClosedRsiValue,
         targetPrice: candleData[candleData.length - 2].close,
       };
@@ -102,9 +88,7 @@ export function findOpportunity(
         strategy: AnalyzeStrategy.RSI_WITH_BB,
         direction: TrendDirection.BEARISH,
         timeFrame: timeFrame,
-        lowerTimeFrame: lowerTimeFrame,
         eventNumber: eventNumber,
-        lowerTimeFrameEventNumber: lowerTimeFrameEventNumber,
         rsiValue: lastClosedRsiValue,
         targetPrice: candleData[candleData.length - 2].close,
       };
@@ -132,4 +116,22 @@ export function findBollingerBandPercentage(
   } else {
     return 0;
   }
+}
+
+export function bollingerBandScore(
+  tradingPrice: number,
+  bbValue: BollingerBandsOutput,
+  rsiValue: number
+): number {
+  let bbPercentage = 0;
+
+  if (tradingPrice < bbValue.middle) {
+    bbPercentage =
+      ((bbValue.middle - tradingPrice) / (bbValue.middle - bbValue.lower)) * -1;
+  } else if (tradingPrice > bbValue.middle) {
+    bbPercentage =
+      (tradingPrice - bbValue.middle) / (bbValue.upper - bbValue.middle);
+  }
+
+  return bbPercentage;
 }

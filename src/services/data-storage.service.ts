@@ -91,20 +91,20 @@ export class DataStorageService {
     let eventNumber1Hour = Math.floor(eventNumber30Minute / 2);
     let eventNumber2Hour = Math.floor(eventNumber1Hour / 2);
     let eventNumber4Hour = Math.floor(eventNumber2Hour / 2);
-    let eventNumber12Hour = Math.floor(eventNumber4Hour / 2);
+    let eventNumber12Hour = Math.floor(eventNumber4Hour / 3);
     let eventNumber1Day = Math.floor(eventNumber12Hour / 2);
 
     let chartString = "";
 
     // once in the middle of every 1Day candle
-    // if (eventNumber15Minute % 96 === 0) {
-    //   chartString = `, ${ChartTimeFrame.ONE_DAY}${chartString}`;
-    //   await this.fetchTimeFrameChartData(
-    //     eventNumber1Day,
-    //     DataStorageTable.table1Day,
-    //     ChartTimeFrame.ONE_DAY
-    //   );
-    // }
+    if (eventNumber15Minute % 96 === 0) {
+      chartString = `, ${ChartTimeFrame.ONE_DAY}${chartString}`;
+      await this.fetchTimeFrameChartData(
+        eventNumber1Day,
+        DataStorageTable.table1Day,
+        ChartTimeFrame.ONE_DAY
+      );
+    }
 
     // once in the middle of every 12Hour candle
     // if (eventNumber15Minute % 48 === 0) {

@@ -37,41 +37,60 @@ export class MessageConstructService {
 
         let signalIsNotInRecentHistory = this.signalNotInRecentList(signal);
 
-        let emojiEnabled = false;
-        if (
-          signal.timeFrame === ChartTimeFrame.ONE_HOUR ||
-          signal.timeFrame === ChartTimeFrame.TWO_HOUR ||
-          signal.timeFrame === ChartTimeFrame.FOUR_HOUR ||
-          signal.timeFrame === ChartTimeFrame.TWELVE_HOUR ||
-          signal.timeFrame === ChartTimeFrame.ONE_DAY
-        ) {
-          emojiEnabled = true;
-        }
-
         if (signalIsNotInRecentHistory) {
           if (signal.strategy === AnalyzeStrategy.RSI_DIVERGENCE) {
-            if (emojiEnabled) {
-              strategyIcon = "💎";
-            }
+            strategyIcon = "💎";
             strategyLabel = " (RSI-DVG)";
           }
 
+          if (signal.strategy === AnalyzeStrategy.RSI_3_DIVERGENCE) {
+            strategyIcon = "💰";
+            strategyLabel = " (RSI3-DVG)";
+          }
+
           if (signal.strategy === AnalyzeStrategy.PUMP_OR_DUMP) {
-            if (emojiEnabled) {
-              strategyIcon = "🔮";
-            }
+            strategyIcon = "🔮";
             strategyLabel =
               signal.direction === TrendDirection.BULLISH
                 ? " (PUMP)"
                 : " (DUMP)";
-            strategyLabel = " (PUMP)";
           }
 
           if (signal.strategy === AnalyzeStrategy.RSI_WITH_BB) {
-            if (emojiEnabled) {
-              strategyIcon = "🔥";
-            }
+            strategyIcon = "🔥";
             strategyLabel = " (RSI+BB)";
+          }
+
+          if (signal.strategy === AnalyzeStrategy.SWING_HIGH_LOW) {
+            strategyIcon = "🔔";
+            strategyLabel =
+              signal.direction === TrendDirection.BULLISH
+                ? " (SWING-L)"
+                : " (SWING-H)";
+          }
+
+          if (signal.strategy === AnalyzeStrategy.RSI_3PERIOD_OVEREXTEND) {
+            strategyIcon = "🔥";
+            strategyLabel =
+              signal.direction === TrendDirection.BULLISH
+                ? " (RSI3-OverSold)"
+                : " (RSI3-Overbought)";
+          }
+
+          if (signal.strategy === AnalyzeStrategy.HIGHEST_BB) {
+            strategyLabel = " (Highest-BB)";
+          }
+
+          if (signal.strategy === AnalyzeStrategy.HIGHEST_RSI) {
+            strategyLabel = " (Highest-RSI)";
+          }
+
+          if (signal.strategy === AnalyzeStrategy.LOWEST_BB) {
+            strategyLabel = " (Lowest-BB)";
+          }
+
+          if (signal.strategy === AnalyzeStrategy.LOWEST_RSI) {
+            strategyLabel = " (Lowest-RSI)";
           }
 
           tmpMessage = `${trendIcon} - ${symbolAndTimeFrameText} - ${strategyIcon}${strategyLabel}\n`;
@@ -97,13 +116,17 @@ export class MessageConstructService {
   private signalNotInRecentList(signal: AnalyzeResult): boolean {
     let lastSignalEventNumber: number | null = null;
 
+    let skipStrategy =
+      signal.strategy === AnalyzeStrategy.RSI_DIVERGENCE ||
+      signal.strategy === AnalyzeStrategy.SWING_HIGH_LOW;
+
     this.signalHistory.some((item) => {
       if (
         item.symbol === signal.symbol &&
         item.strategy === signal.strategy &&
         item.timeFrame === signal.timeFrame &&
         // skip this checkup for RSI-Divergence
-        item.strategy !== AnalyzeStrategy.RSI_DIVERGENCE
+        !skipStrategy
       ) {
         lastSignalEventNumber = item.eventNumber;
         return true;

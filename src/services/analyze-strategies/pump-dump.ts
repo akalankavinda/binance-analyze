@@ -47,27 +47,13 @@ export function findOpportunity(
       lastClosedCandle2.high >= bbUpperBandUpperLimit &&
       lastClosedCandle2.close > lastClosedBbValue.upper;
 
-    let lowerTimeFrame = ChartTimeFrame.FIFTEEN_MINUTE;
-    let lowerTimeFrameEventNumber = eventNumber;
-
-    if (timeFrame === ChartTimeFrame.ONE_HOUR) {
-      lowerTimeFrameEventNumber = eventNumber * 4;
-    } else if (timeFrame === ChartTimeFrame.TWO_HOUR) {
-      lowerTimeFrameEventNumber = eventNumber * 8;
-    } else if (timeFrame === ChartTimeFrame.FOUR_HOUR) {
-      lowerTimeFrame = ChartTimeFrame.ONE_HOUR;
-      lowerTimeFrameEventNumber = eventNumber * 4;
-    }
-
     if (bbCurrentIsBelowLimit) {
       return <AnalyzeResult>{
         symbol: symbol,
         strategy: AnalyzeStrategy.PUMP_OR_DUMP,
         direction: TrendDirection.BEARISH,
         timeFrame: timeFrame,
-        lowerTimeFrame: lowerTimeFrame,
         eventNumber: eventNumber,
-        lowerTimeFrameEventNumber: lowerTimeFrameEventNumber,
         rsiValue: lastClosedRsiValue,
         targetPrice: candleData[candleData.length - 2].close,
       };
@@ -77,9 +63,7 @@ export function findOpportunity(
         strategy: AnalyzeStrategy.PUMP_OR_DUMP,
         direction: TrendDirection.BULLISH,
         timeFrame: timeFrame,
-        lowerTimeFrame: lowerTimeFrame,
         eventNumber: eventNumber,
-        lowerTimeFrameEventNumber: lowerTimeFrameEventNumber,
         rsiValue: lastClosedRsiValue,
         targetPrice: candleData[candleData.length - 2].close,
       };
